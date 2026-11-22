@@ -526,6 +526,7 @@ function App() {
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
     try {
       setRoomError('');
+      try { localStorage.removeItem(ROOM_STORAGE_KEY); } catch {}
       isRoomHostRef.current = false;
       approvedPeerRef.current = '';
       setRoomStatus('joining');
