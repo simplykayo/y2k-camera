@@ -438,3 +438,47 @@ footer b{color:#245b91;margin-left:5px}
 .app-shell[data-style="meet"] .topbar .main-tabs button.active{background:#fff;color:#1a73e8}
 .app-shell .together-panel{margin-top:18px}
 @media(max-width:700px){.app-shell .topbar{flex-wrap:wrap;gap:10px}.app-shell .topbar .main-tabs{order:3;width:100%;margin:0;justify-content:center}.app-shell .topbar .main-tabs button{flex:1;justify-content:center}.app-shell .top-actions{margin-left:auto}}
+
+
+/* Dedicated app navigation row, independent of the camera page */
+.app-shell>.topbar{display:grid;grid-template-columns:auto minmax(190px,1fr) auto;align-items:center;gap:clamp(12px,2vw,28px)}
+.app-shell>.topbar>.main-tabs{grid-column:2;grid-row:1;justify-self:center;display:flex!important;visibility:visible!important;opacity:1!important;position:relative;z-index:5;width:max-content;max-width:100%;margin:0;padding:4px;background:#e9ecef;border:1px solid #d5d9dc;border-radius:999px}
+.app-shell>.topbar>.main-tabs button{display:inline-flex!important;visibility:visible!important;align-items:center;justify-content:center;min-width:112px;padding:10px 17px;background:transparent;border:0;border-radius:999px;color:#56616a;font:600 11px Arial,sans-serif;letter-spacing:.2px;white-space:nowrap;cursor:pointer}
+.app-shell>.topbar>.main-tabs button.active{background:#fff;color:#1967d2;box-shadow:0 1px 4px #20212420}
+.app-shell>.topbar>.top-actions{grid-column:3;grid-row:1}
+.app-shell .synced-results{margin:24px 0;padding:18px;background:var(--panel,#f4f2ed);border:1px solid var(--line,#d8d4cc);border-radius:14px}
+.app-shell .synced-results-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px}
+.app-shell .synced-results-head h3{margin:5px 0 0;font-size:20px}
+.app-shell .synced-results-head>span{font:10px "Courier New",monospace;color:var(--muted,#777)}
+.app-shell .synced-pair-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.app-shell .synced-pair-grid figure{min-width:0;margin:0;padding:8px;background:var(--surface,#fff);border:1px solid var(--line,#d8d4cc);border-radius:10px}
+.app-shell .synced-pair-grid img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px}
+.app-shell .synced-pair-grid figcaption{padding:9px 3px 3px;font:10px "Courier New",monospace;color:var(--muted,#666)}
+.app-shell .synced-pending{display:grid;place-items:center;min-height:120px;background:#e9ecef;color:#66717a;font:11px Arial,sans-serif;border-radius:6px}
+.app-shell .synced-strip{padding:12px;background:var(--surface,#fff);border:1px solid var(--line,#d8d4cc);border-radius:10px}
+.app-shell .synced-strip-label{padding:7px 2px;font:700 9px "Courier New",monospace;letter-spacing:1px;color:var(--muted,#777)}
+.app-shell .synced-strip-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:6px;background:#dfe3e5}
+.app-shell .synced-strip-row:first-of-type{border-radius:7px 7px 0 0}
+.app-shell .synced-strip-row:last-of-type{border-radius:0 0 7px 7px}
+.app-shell .synced-strip-row>div{min-width:0;aspect-ratio:3/4;background:#cbd2d6;overflow:hidden}
+.app-shell .synced-strip-row img{display:block;width:100%;height:100%;object-fit:cover}
+.app-shell .synced-mode-picker{display:flex;justify-content:center;gap:5px;margin:12px auto;padding:4px;width:max-content;max-width:100%;background:var(--panel,#f1eee8);border:1px solid var(--line,#d8d4cc);border-radius:9px}
+.app-shell .synced-mode-picker button{padding:9px 14px;border:0;border-radius:6px;background:transparent;color:var(--muted,#777);font:700 9px "Courier New",monospace;letter-spacing:.5px;cursor:pointer}
+.app-shell .synced-mode-picker button.active{background:var(--surface,#fff);color:var(--ink,#222);box-shadow:0 1px 4px #00000014}
+.app-shell[data-style="meet"] .synced-results{background:#fff;border:1px solid #e3e6e8}
+.app-shell[data-style="meet"] .synced-mode-picker{background:#f1f3f4;border:0;border-radius:24px}
+.app-shell[data-style="meet"] .synced-mode-picker button{font:600 11px Arial,sans-serif;border-radius:20px}
+.app-shell[data-style="meet"] .synced-mode-picker button.active{background:#fff;color:#1a73e8}
+@media(max-width:760px){
+ .app-shell>.topbar{display:flex;flex-wrap:wrap;height:auto;min-height:64px;padding:10px 0;gap:10px}
+ .app-shell>.topbar>.brand{order:1}
+ .app-shell>.topbar>.top-actions{order:2;margin-left:auto}
+ .app-shell>.topbar>.main-tabs{order:3;width:100%;justify-self:stretch;margin:0}
+ .app-shell>.topbar>.main-tabs button{flex:1;min-width:0}
+}
+@media(max-width:520px){
+ .app-shell .synced-pair-grid{grid-template-columns:1fr}
+ .app-shell .synced-strip-row{gap:3px;padding:4px}
+ .app-shell .synced-mode-picker{width:100%}
+ .app-shell .synced-mode-picker button{flex:1;padding:9px 7px}
+}
