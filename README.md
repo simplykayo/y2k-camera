@@ -57,3 +57,17 @@ Together Mode adds code-based video rooms using PeerJS/WebRTC. One person create
 - The six-letter room code is a short-lived-in-practice room identifier, not a password. Share it privately and create a fresh room for each session; the host must approve incoming video calls.
 - PeerJS's public signalling service is used to establish connections. Some restrictive networks may require a TURN relay for reliable connectivity.
 - Together Mode requires HTTPS and camera/microphone permission on both devices.
+
+
+## Google Meet-style appearance and camera tools
+
+Choose **Google Meet** in the Style selector for a conventional meeting interface with a neutral palette, simple controls, a dark camera stage, and a familiar call toolbar.
+
+Additional tools include camera quality presets (480p/720p/1080p), preview aspect ratios, fullscreen preview, picture-in-picture where supported, a speaker test, keyboard shortcuts (M = mic, V = camera, F = fullscreen, Space = capture), undo last photo, download-all and delete-all gallery actions, and a one-click invite message.
+
+## Together Mode security notes
+
+- Incoming host-side data connections are held until the host approves the matching incoming video call. Rejected callers' pending data connections are closed.
+- Room codes are generated with browser cryptographic randomness and unbiased character selection. They are temporary room identifiers, **not passwords or account authentication**. Only share them with the intended person.
+- WebRTC media/data connections are peer-to-peer when the network permits; the PeerJS signalling service is still used to establish them. A TURN relay may be required on restrictive networks.
+- This is a browser-only project and has not undergone a professional penetration test or independent security audit. Do not use it for sensitive or confidential conversations.
