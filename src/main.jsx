@@ -301,6 +301,8 @@ function App() {
       audio: { echoCancellation: true, noiseSuppression: true },
       video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
     });
+    stream.getAudioTracks().forEach(track=>track.enabled=micEnabled);
+    stream.getVideoTracks().forEach(track=>track.enabled=videoEnabled);
     streamRef.current = stream;
     if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
     setCameraReady(true);
