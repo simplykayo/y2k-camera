@@ -89,7 +89,7 @@ function App() {
   const dataConnectionsRef = useRef([]);
   const [togetherOpen, setTogetherOpen] = useState(false);
   const [roomStatus, setRoomStatus] = useState('idle');
-  const [roomLink, setRoomLink] = useState('');
+  const [roomCode, setRoomCode] = useState('');
   const [joinInput, setJoinInput] = useState('');
   const [remoteReady, setRemoteReady] = useState(false);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -135,8 +135,6 @@ function App() {
 
   useEffect(() => {
     startCamera('user');
-    const match = window.location.hash.match(/(?:^#|&)room=([^&]+)/);
-    if (match) { setJoinInput(window.location.href); setTogetherOpen(true); }
     return () => {
       peerRef.current?.destroy();
       streamRef.current?.getTracks().forEach(track => track.stop());
@@ -267,11 +265,12 @@ function App() {
       setRoomError('');
       setRoomStatus('starting');
       const stream = await prepareRoomCamera();
-      const peer = new Peer();
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const code = Array.from(crypto.getRandomValues(new Uint8Array(6)), byte => alphabet[byte % alphabet.length]).join('');
+      const peer = new Peer(code);
       peerRef.current = peer;
       peer.on('open', id => {
-        const link = window.location.origin + window.location.pathname + '#room=' + encodeURIComponent(id);
-        setRoomLink(link);
+        setRoomCode(id);
         setRoomStatus('waiting');
       });
       peer.on('call', call => {
@@ -289,13 +288,8 @@ function App() {
   };
 
   const joinRoom = async () => {
-    let targetId = joinInput.trim();
-    try {
-      if (targetId.includes('://')) targetId = new URL(targetId).hash.match(/(?:^#|&)room=([^&]+)/)?.[1] || '';
-      else if (targetId.startsWith('#')) targetId = targetId.match(/room=([^&]+)/)?.[1] || '';
-      targetId = decodeURIComponent(targetId);
-    } catch { targetId = ''; }
-    if (!targetId) { setRoomError('Paste a valid invite link from the person hosting the room.'); return; }
+    const targetId = joinInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!/^[A-HJ-NP-Z2-9]{6}$/.test(targetId)) { setRoomError('Enter the 6-character room code.'); return; }
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
     try {
       setRoomError('');
@@ -305,7 +299,7 @@ function App() {
       peerRef.current = peer;
       peer.on('open', () => {
         const call = peer.call(targetId, stream);
-        if (!call) { setRoomError('Could not reach that room. Ask for a fresh invite link.'); setRoomStatus('error'); return; }
+        if (!call) { setRoomError('Could not reach that room. Ask for a new room code.'); setRoomStatus('error'); return; }
         attachRemoteCall(call);
         const connection = peer.connect(targetId, { reliable: true });
         connection.on('open', () => setupDataConnection(connection));
@@ -349,7 +343,7 @@ function App() {
     setRemoteStream(null);
     setDataReady(false);
     setRoomStatus('idle');
-    setRoomLink('');
+    setRoomCode('');
     setRoomError('');
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (localRoomVideoRef.current) localRoomVideoRef.current.srcObject = null;
@@ -357,9 +351,9 @@ function App() {
     startCamera(facing);
   };
 
-  const copyRoomLink = async () => {
-    try { await navigator.clipboard.writeText(roomLink); }
-    catch { setRoomError('Could not copy automatically. Select and copy the invite link.'); }
+  const copyRoomCode = async () => {
+    try { await navigator.clipboard.writeText(roomCode); }
+    catch { setRoomError('Could not copy automatically. Select and copy the room code.'); }
   };
 
 
@@ -511,22 +505,22 @@ function App() {
 
         {togetherOpen && <section className="together-panel">
           <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><button className="text-button" onClick={() => setTogetherOpen(false)}>CLOSE ×</button></div>
-          <div className="together-intro"><div><span className="room-kicker">PRIVATE PHOTO ROOM · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Make a room, send the invite link, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
+          <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
           {roomStatus==='idle' || roomStatus==='error' ? <div className="room-entry">
-            <div className="room-create"><span className="room-number">01 / HOST</span><h3>Start a private room</h3><p>Create a one-time invite link. Keep it between you two.</p><button className="primary-button" onClick={createRoom}>CREATE INVITE LINK ↗</button></div>
-            <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Paste the room link your person sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value)} placeholder="Paste private room invite link…" /><button className="secondary-room-button" onClick={joinRoom}>JOIN THEIR ROOM ↗</button></div>
+            <div className="room-create"><span className="room-number">01 / HOST</span><h3>Start a private room</h3><p>Generate a 6-character code to share with your person.</p><button className="primary-button" onClick={createRoom}>GENERATE ROOM CODE ↗</button></div>
+            <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Enter the 6-character code they sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0,6))} placeholder="e.g. K7M2QX" maxLength={6} autoComplete="off" /><button className="secondary-room-button" onClick={joinRoom}>JOIN ROOM ↗</button></div>
           </div> : <div className="room-active">
-            {roomLink && <div className="invite-box"><div><span className="room-number">YOUR PRIVATE INVITE LINK</span><code>{roomLink}</code></div><button className="primary-button" onClick={copyRoomLink}>COPY LINK ↗</button></div>}
+            {roomCode && <div className="invite-box"><div><span className="room-number">YOUR ROOM CODE</span><code className="room-code-display">{roomCode}</code></div><button className="primary-button" onClick={copyRoomCode}>COPY CODE ↗</button></div>}
             {incomingCall && <div className="incoming-invite"><div><b>♡ SOMEONE HAS YOUR INVITE</b><span>They are asking to join your private camera room.</span></div><button className="primary-button" onClick={acceptIncomingCall}>ACCEPT ↗</button><button className="secondary-room-button" onClick={rejectIncomingCall}>DECLINE ×</button></div>}
             <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
             <div className="room-feeds">
-              <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline/><span>YOU · CAM 01</span></div>
-              <div className="room-feed remote-feed">{remoteReady ? <video ref={remoteVideoRef} autoPlay playsInline/> : <div className="waiting-feed"><b>♡</b><span>WAITING FOR YOUR PERSON</span><small>Send them your private invite link</small></div>}<span>YOUR PERSON · CAM 02</span></div>
+              <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline style={{filter:filterAtIntensity(activeFilter.css,intensity)}}/><span>YOU · CAM 01</span></div>
+              <div className="room-feed remote-feed">{remoteReady ? <video ref={remoteVideoRef} autoPlay playsInline style={{filter:filterAtIntensity(activeFilter.css,intensity)}}/> : <div className="waiting-feed"><b>♡</b><span>WAITING FOR YOUR PERSON</span><small>Share your 6-character room code</small></div>}<span>YOUR PERSON · CAM 02</span></div>
             </div>
             {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Pick your filter and timer in the camera studio, then capture both cameras at once.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
           </div>}
           {roomError && <div className="room-error">{roomError}</div>}
-          <div className="room-privacy">⌑ PRIVATE INVITE LINK <span>·</span> HOST APPROVAL REQUIRED <span>·</span> VIDEO IS PEER-TO-PEER</div>
+          <div className="room-privacy">⌑ SHARE CODE ONLY WITH YOUR PERSON <span>·</span> HOST APPROVAL REQUIRED <span>·</span> VIDEO IS PEER-TO-PEER</div>
         </section>}
         <section className="results-section">
           <div className="section-head"><span><i className="tiny-square"></i> YOUR CONTACT SHEET</span><span className="mono-label">{shots.length} / 4 FRAMES</span></div>
