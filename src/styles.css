@@ -214,3 +214,9 @@ footer b{color:#245b91;margin-left:5px}
 .room-privacy{margin-top:15px;padding-top:11px;border-top:1px solid #b5bfbd;text-align:center;color:#718087;font:7px "Courier New",monospace;letter-spacing:.7px}
 .room-privacy span{padding:0 7px;color:#9aa5a4}
 @media(max-width:650px){.top-actions{gap:5px}.top-pill{padding:8px 8px;font-size:8px}.together-panel{padding:10px}.together-intro{align-items:flex-start;flex-direction:column}.room-entry{grid-template-columns:1fr}.room-feeds{gap:6px}.room-feed{border-width:3px}.room-feed>span{font-size:6px;left:4px;top:4px;padding:4px}.waiting-feed span{font-size:7px}.waiting-feed small{font-size:6px}.invite-box{align-items:flex-start;flex-direction:column}.room-call-controls{align-items:flex-start;flex-direction:column}.room-privacy{line-height:1.8}}
+
+.incoming-invite{display:flex;align-items:center;gap:10px;padding:12px;margin-bottom:12px;background:#f0eee6;border:1px solid #a9aaa0;box-shadow:inset 1px 1px #fff}
+.incoming-invite>div{flex:1;display:grid;gap:5px}
+.incoming-invite b{font:9px "Courier New",monospace;letter-spacing:.6px;color:#245b91}
+.incoming-invite span{font:9px "Courier New",monospace;color:#65747a}
+@media(max-width:560px){.incoming-invite{align-items:flex-start;flex-wrap:wrap}.incoming-invite>div{flex:1 1 100%}}
