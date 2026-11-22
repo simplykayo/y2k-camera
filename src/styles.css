@@ -495,3 +495,11 @@ footer b{color:#245b91;margin-left:5px}
 .connection-quality.quality-fair i{background:#c28a25;box-shadow:0 0 0 3px #c28a251a}
 .connection-quality.quality-poor i{background:#c04444;box-shadow:0 0 0 3px #c044441a}
 .app-shell[data-style="meet"] .connection-quality{background:#fff;border-color:#dadce0;border-radius:9px;font-family:Arial,sans-serif;color:#3c4043}
+
+
+/* Save controls for locally-held Together captures */
+.app-shell .synced-save-button{display:block;width:100%;margin-top:9px;padding:10px 12px;border:1px solid var(--line,#d8d4cc);border-radius:7px;background:var(--surface,#fff);color:var(--ink,#333);font:700 10px "Courier New",monospace;letter-spacing:.6px;cursor:pointer}
+.app-shell .synced-save-button:hover,.app-shell .synced-strip-save:hover{border-color:var(--theme-accent,#777);background:var(--panel,#f4f2ed)}
+.app-shell .synced-strip-row>div{display:flex;flex-direction:column;align-items:stretch;gap:4px;height:auto;aspect-ratio:auto;padding:4px;background:var(--surface,#fff)}
+.app-shell .synced-strip-row>div img{width:100%;aspect-ratio:3/4;height:auto;object-fit:cover}
+.app-shell .synced-strip-save{padding:6px 2px;border:1px solid var(--line,#d8d4cc);border-radius:4px;background:var(--surface,#fff);color:var(--ink,#333);font:700 8px "Courier New",monospace;cursor:pointer}
