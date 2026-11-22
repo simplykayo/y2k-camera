@@ -409,3 +409,22 @@ footer b{color:#245b91;margin-left:5px}
 .room-success{margin:8px 0;padding:10px 13px;background:#e6f4ea;color:#137333;border-radius:8px;font:12px Arial,sans-serif}
 @media(max-width:850px){.app-shell[data-style="meet"] .studio-grid{grid-template-columns:1fr}.app-shell[data-style="meet"] .filters-column>.section-head{margin-top:14px}.app-shell[data-style="meet"] .redesigned-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:420px}}
 @media(max-width:560px){.app-shell[data-style="meet"] .intro{align-items:flex-start;flex-direction:column}.app-shell[data-style="meet"] .camera-bottom{padding:0 10px}.app-shell[data-style="meet"] .meet-controls{width:100%;gap:6px;padding:8px}.app-shell[data-style="meet"] .meet-control{min-width:0;padding:9px}.app-shell[data-style="meet"] .capture-preferences{justify-content:space-between}.app-shell[data-style="meet"] .capture-preferences label{flex-direction:column;align-items:flex-start}}
+
+
+/* Dedicated Camera / Together navigation and independent Together controls */
+.main-tabs{display:flex;gap:6px;width:max-content;margin:18px auto 8px;padding:5px;background:var(--panel,#f1eee8);border:1px solid var(--line,#d8d4cc);border-radius:12px}
+.main-tabs button{position:relative;display:flex;align-items:center;gap:8px;padding:11px 24px;border:0;border-radius:8px;background:transparent;color:var(--muted,#777);font:700 10px "Courier New",monospace;letter-spacing:1px;cursor:pointer}
+.main-tabs button.active{background:var(--surface,#fff);color:var(--ink,#242424);box-shadow:0 1px 5px #00000012}
+.tab-live-dot{width:7px;height:7px;border-radius:50%;background:#24a46a}
+.together-device-controls{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin:18px 0}
+.together-filter-panel{margin:22px 0;padding:18px;background:var(--panel,#f4f2ed);border:1px solid var(--line,#d8d4cc);border-radius:12px}
+.together-filter-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px}
+.together-filter-head h3{margin:5px 0 0;font-size:22px}.together-filter-head label{display:grid;grid-template-columns:auto auto;gap:8px;align-items:center;min-width:190px;font:10px "Courier New",monospace;color:var(--muted,#777)}
+.together-filter-head label input{grid-column:1/-1;width:100%;accent-color:var(--accent,#888)}
+.together-filter-panel>.filter-category-label{display:flex;align-items:center;gap:12px;margin:10px 0;font:10px "Courier New",monospace;color:var(--muted,#777)}
+.together-filter-panel>.filter-category-label select{padding:8px;background:var(--surface,#fff);border:1px solid var(--line,#ccc);border-radius:6px;color:var(--ink,#222)}
+.together-filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px;max-height:360px;overflow:auto;padding:3px}
+.together-filter-grid .redesigned-filter-tile{min-height:76px}
+.app-shell[data-style="meet"] .main-tabs{background:#f1f3f4;border:0;border-radius:24px}.app-shell[data-style="meet"] .main-tabs button{font:600 12px Arial,sans-serif;letter-spacing:0;color:#5f6368;border-radius:20px}.app-shell[data-style="meet"] .main-tabs button.active{background:#fff;color:#1a73e8;box-shadow:0 1px 4px #00000018}
+.app-shell[data-style="meet"] .together-filter-panel{background:#fff;border:1px solid #e3e6e8;border-radius:12px}.app-shell[data-style="meet"] .together-filter-head h3{font:500 21px Arial,sans-serif}.app-shell[data-style="meet"] .together-filter-grid .redesigned-filter-tile{background:#fff;border:1px solid #e3e6e8;border-radius:9px}.app-shell[data-style="meet"] .together-filter-grid .redesigned-filter-tile.chosen{background:#e8f0fe;border-color:#8ab4f8}
+@media(max-width:560px){.main-tabs{width:100%}.main-tabs button{flex:1;justify-content:center;padding:10px}.together-filter-head{align-items:flex-start;flex-direction:column}.together-filter-head label{width:100%}.together-filter-panel>.filter-category-label{align-items:flex-start;flex-direction:column}.together-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
