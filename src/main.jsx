@@ -768,7 +768,7 @@ function App() {
             </div>
             {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Your Together filter is independent from the solo camera. Choose a look below; it applies to your preview and your saved synced photo.</p><div className="synced-mode-picker" role="group" aria-label="Synchronized capture mode"><button type="button" className={mode==='single'?'active':''} onClick={()=>setMode('single')} aria-pressed={mode==='single'}>ONE PHOTO</button><button type="button" className={mode==='strip'?'active':''} onClick={()=>setMode('strip')} aria-pressed={mode==='strip'}>4-PHOTO STRIP</button></div><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || syncRunning}>◎ {syncRunning?'CAPTURING BOTH CAMERAS…':'SYNC SHUTTER — BOTH CAMERAS'}</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
 
-          </div>
+          </div>}
                       {syncedLocalPhotos.length > 0 && <section className="synced-results" aria-live="polite">
             <div className="synced-results-head"><div><span className="room-kicker">BOTH CAMERAS · SHARED RESULT</span><h3>{syncedCaptureLabel}</h3></div><span>{syncedRemotePhotos.filter(Boolean).length}/{syncedLocalPhotos.filter(Boolean).length} RECEIVED</span></div>
             {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
