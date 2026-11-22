@@ -110,6 +110,8 @@ function App() {
   const [roomExpiresAt, setRoomExpiresAt] = useState(null);
   const [roomSecondsLeft, setRoomSecondsLeft] = useState(0);
   const [autoAcceptInvites, setAutoAcceptInvites] = useState(() => { try { return localStorage.getItem('y2k-auto-accept-invites') === 'true'; } catch { return false; } });
+  const autoAcceptInvitesRef = useRef(autoAcceptInvites);
+  useEffect(() => { autoAcceptInvitesRef.current = autoAcceptInvites; }, [autoAcceptInvites]);
   const [joinInput, setJoinInput] = useState('');
   const [remoteReady, setRemoteReady] = useState(false);
   const [connectionQuality, setConnectionQuality] = useState({ level: 'checking', label: 'CHECKING', detail: 'Measuring connection' });
@@ -466,7 +468,7 @@ function App() {
       peer.on('call', call => {
         if (approvedPeerRef.current && approvedPeerRef.current !== call.peer) { call.close(); return; }
         if (callRef.current || incomingCallRef.current) { call.close(); return; }
-        if (autoAcceptInvites) {
+        if (autoAcceptInvitesRef.current) {
           const stream = streamRef.current;
           if (!stream) { call.close(); return; }
           incomingCallRef.current = call;
