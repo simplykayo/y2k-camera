@@ -302,3 +302,12 @@ footer b{color:#245b91;margin-left:5px}
 .app-shell[data-theme="red"] .primary-button{box-shadow:3px 3px 0 #65151b}
 .app-shell[data-theme="noir"] .camera-shell,.app-shell[data-theme="noir"] .settings-column{box-shadow:0 0 0 1px #777,inset 0 0 0 1px #ffffff18}
 .app-shell[data-theme="noir"] .filter-thumb{filter:grayscale(1)}
+
+/* Three-column studio: camera, filters, and a dedicated settings rail. */
+.studio-grid{grid-template-columns:minmax(300px,1.1fr) minmax(300px,1fr) minmax(255px,.78fr);gap:18px}
+.settings-column{margin-top:0;min-width:0}
+.settings-panel{grid-template-columns:1fr;gap:10px}
+.theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:1120px){.studio-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.settings-column{grid-column:1/-1}.settings-panel{grid-template-columns:repeat(3,minmax(0,1fr))}.theme-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){.studio-grid{grid-template-columns:1fr}.settings-column{grid-column:auto}.settings-panel{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.settings-panel{grid-template-columns:1fr}}
