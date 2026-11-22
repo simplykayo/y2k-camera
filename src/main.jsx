@@ -165,6 +165,15 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!cameraReady && roomStatus === 'idle') return;
+    navigator.mediaDevices?.enumerateDevices?.().then(list=>setDevices({
+      audioinput:list.filter(d=>d.kind==='audioinput'),
+      videoinput:list.filter(d=>d.kind==='videoinput'),
+      audiooutput:list.filter(d=>d.kind==='audiooutput')
+    })).catch(()=>{});
+  }, [cameraReady, roomStatus]);
+
+  useEffect(() => {
     if (cameraReady && togetherOpen && localRoomVideoRef.current && streamRef.current) {
       localRoomVideoRef.current.srcObject = streamRef.current;
       localRoomVideoRef.current.play().catch(() => {});
