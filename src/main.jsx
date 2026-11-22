@@ -48,6 +48,20 @@ const FILTERS = [
 const GROUPS = ['ALL', 'Y2K', 'FILM', 'COLOR', 'DREAM', 'RETRO', 'ODD', 'MOOD', 'MONO'];
 const cx = (...items) => items.filter(Boolean).join(' ');
 
+function filterAtIntensity(filter, strength) {
+  if (!filter || filter === 'none') return 'none';
+  const amount = Math.max(0, Math.min(100, strength)) / 100;
+  const neutral = { brightness:1, contrast:1, saturate:1, 'hue-rotate':0, sepia:0, grayscale:0, invert:0, blur:0 };
+  return filter.replace(/([a-z-]+)\(([^)]+)\)/g, (match, name, raw) => {
+    const value = parseFloat(raw);
+    if (!Number.isFinite(value)) return match;
+    const base = neutral[name] ?? 0;
+    const next = base + (value - base) * amount;
+    const unit = raw.trim().replace(/^[-+0-9.]+/, '');
+    return name + '(' + Number(next.toFixed(3)) + unit + ')';
+  });
+};
+
 function App() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -70,7 +84,7 @@ function App() {
 
   const activeFilter = useMemo(() => FILTERS.find(f => f.name === selected) || FILTERS[0], [selected]);
   const visibleFilters = useMemo(() => group === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === group), [group]);
-  const liveStyle = { filter: activeFilter.css, opacity: 1 };
+  const liveStyle = { filter: filterAtIntensity(activeFilter.css, intensity), opacity: 1 };
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(track => track.stop());
@@ -134,7 +148,7 @@ function App() {
     const ctx = canvas.getContext('2d');
     ctx.save();
     if (facing === 'user') { ctx.translate(width, 0); ctx.scale(-1, 1); }
-    ctx.filter = activeFilter.css === 'none' ? 'none' : activeFilter.css;
+    ctx.filter = filterAtIntensity(activeFilter.css, intensity);
     ctx.drawImage(video, 0, 0, width, height);
     ctx.restore();
     if (activeFilter.tint && activeFilter.alpha) {
