@@ -97,9 +97,11 @@ function App() {
   const [roomError, setRoomError] = useState('');
   const [roomMode, setRoomMode] = useState('call');
   const [incomingCall, setIncomingCall] = useState(null);
+  const [remoteFilter, setRemoteFilter] = useState({ name: 'Original', intensity: 100 });
 
   const activeFilter = useMemo(() => FILTERS.find(f => f.name === selected) || FILTERS[0], [selected]);
   const visibleFilters = useMemo(() => group === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === group), [group]);
+  const remoteActiveFilter = useMemo(() => FILTERS.find(f => f.name === remoteFilter.name) || FILTERS[0], [remoteFilter.name]);
   const liveStyle = { filter: filterAtIntensity(activeFilter.css, intensity), opacity: 1 };
 
   const stopCamera = useCallback(() => {
@@ -248,16 +250,27 @@ function App() {
 
   const setupDataConnection = connection => {
     dataConnectionsRef.current.push(connection);
-    if (connection.open) setDataReady(true);
-    connection.on('open', () => setDataReady(true));
+    const sendCurrentFilter = () => connection.send({ type: 'Y2K_FILTER', name: selected, intensity });
+    if (connection.open) { setDataReady(true); sendCurrentFilter(); }
+    connection.on('open', () => { setDataReady(true); sendCurrentFilter(); });
     connection.on('data', message => {
-      if (message === 'Y2K_SYNC_SHUTTER') takePhoto();
+      if (message === 'Y2K_SYNC_SHUTTER') { takePhoto(); return; }
+      if (message && typeof message === 'object' && message.type === 'Y2K_FILTER') {
+        const valid = FILTERS.some(filter => filter.name === message.name);
+        if (valid) setRemoteFilter({ name: message.name, intensity: Math.max(0, Math.min(100, Number(message.intensity) || 0)) });
+      }
     });
     connection.on('close', () => {
       dataConnectionsRef.current = dataConnectionsRef.current.filter(item => item !== connection);
       if (!dataConnectionsRef.current.some(item => item.open)) setDataReady(false);
     });
   };
+
+  useEffect(() => {
+    dataConnectionsRef.current.forEach(connection => {
+      if (connection.open) connection.send({ type: 'Y2K_FILTER', name: selected, intensity });
+    });
+  }, [selected, intensity]);
 
   const createRoom = async () => {
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
@@ -341,6 +354,7 @@ function App() {
     dataConnectionsRef.current = [];
     setRemoteReady(false);
     setRemoteStream(null);
+    setRemoteFilter({ name: 'Original', intensity: 100 });
     setDataReady(false);
     setRoomStatus('idle');
     setRoomCode('');
@@ -515,7 +529,7 @@ function App() {
             <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
             <div className="room-feeds">
               <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline style={{filter:filterAtIntensity(activeFilter.css,intensity)}}/><span>YOU · CAM 01</span></div>
-              <div className="room-feed remote-feed">{remoteReady ? <video ref={remoteVideoRef} autoPlay playsInline style={{filter:filterAtIntensity(activeFilter.css,intensity)}}/> : <div className="waiting-feed"><b>♡</b><span>WAITING FOR YOUR PERSON</span><small>Share your 6-character room code</small></div>}<span>YOUR PERSON · CAM 02</span></div>
+              <div className="room-feed remote-feed">{remoteReady ? <video ref={remoteVideoRef} autoPlay playsInline style={{filter:filterAtIntensity(remoteActiveFilter.css,remoteFilter.intensity)}}/> : <div className="waiting-feed"><b>♡</b><span>WAITING FOR YOUR PERSON</span><small>Share your 6-character room code</small></div>}<span>YOUR PERSON · CAM 02</span></div>
             </div>
             {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Pick your filter and timer in the camera studio, then capture both cameras at once.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
           </div>}
