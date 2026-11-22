@@ -51,9 +51,9 @@ The filter presets are implemented with native CSS/canvas color operations, with
 
 ## Together Mode
 
-Together Mode adds code-based video rooms using PeerJS/WebRTC. One person creates a room and shares its six-character code; the other enters the code to request a connection. Both people can see each other's live camera and microphone stream, and the Camera Together tab sends a synchronized shutter signal so both browsers capture locally.
+Together Mode adds code-based video rooms using PeerJS/WebRTC. One person creates a room and shares its six-letter code; the other enters the code to request a connection. Both people can see each other's live camera and microphone stream, and the Camera Together tab sends a synchronized shutter signal so both browsers capture locally.
 
 - Video/audio is sent peer-to-peer using WebRTC; photos remain in each browser's session-only camera roll.
-- The six-character room code is a short-lived-in-practice room identifier, not a password. Share it privately and create a fresh room for each session; the host must approve incoming video calls.
+- The six-letter room code is a short-lived-in-practice room identifier, not a password. Share it privately and create a fresh room for each session; the host must approve incoming video calls.
 - PeerJS's public signalling service is used to establish connections. Some restrictive networks may require a TURN relay for reliable connectivity.
 - Together Mode requires HTTPS and camera/microphone permission on both devices.
