@@ -107,6 +107,8 @@ function App() {
   const [roomCode, setRoomCode] = useState('');
   const [joinInput, setJoinInput] = useState('');
   const [remoteReady, setRemoteReady] = useState(false);
+  const [connectionQuality, setConnectionQuality] = useState({ level: 'checking', label: 'CHECKING', detail: 'Measuring connection' });
+  const incomingCallRef = useRef(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [dataReady, setDataReady] = useState(false);
   const [roomError, setRoomError] = useState('');
@@ -202,6 +204,45 @@ function App() {
       activeVideo.play().catch(() => {});
     }
   }, [cameraReady, activeTab, roomStatus]);
+
+  useEffect(() => {
+    if (roomStatus !== 'connected' || !remoteReady) {
+      setConnectionQuality({ level: 'checking', label: 'CHECKING', detail: 'Waiting for media connection' });
+      return;
+    }
+    let cancelled = false;
+    const measure = async () => {
+      const pc = callRef.current?.peerConnection;
+      if (!pc || pc.connectionState === 'closed') return;
+      try {
+        const stats = await pc.getStats();
+        let rtt = null;
+        let received = 0;
+        let lost = 0;
+        stats.forEach(report => {
+          if (report.type === 'candidate-pair' && report.state === 'succeeded' && (report.nominated || report.selected)) {
+            if (Number.isFinite(report.currentRoundTripTime)) rtt = report.currentRoundTripTime * 1000;
+          }
+          if (report.type === 'inbound-rtp' && !report.isRemote) {
+            received += Number(report.packetsReceived || 0);
+            lost += Number(report.packetsLost || 0);
+          }
+        });
+        const loss = received + lost > 0 ? lost / (received + lost) : null;
+        if (cancelled) return;
+        const weak = (rtt !== null && rtt > 320) || (loss !== null && loss > .08);
+        const fair = (rtt !== null && rtt > 180) || (loss !== null && loss > .025);
+        const level = weak ? 'poor' : fair ? 'fair' : 'good';
+        const detail = [rtt !== null ? Math.round(rtt) + ' ms RTT' : null, loss !== null ? (loss * 100).toFixed(1) + '% packet loss' : null].filter(Boolean).join(' · ') || 'Live media connected';
+        setConnectionQuality({ level, label: level === 'good' ? 'GOOD' : level === 'fair' ? 'FAIR' : 'WEAK', detail });
+      } catch {
+        if (!cancelled) setConnectionQuality({ level: 'checking', label: 'CHECKING', detail: 'Connection stats unavailable' });
+      }
+    };
+    measure();
+    const timer = setInterval(measure, 2500);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [roomStatus, remoteReady]);
 
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
@@ -356,14 +397,16 @@ function App() {
     connection.on('open', () => { setDataReady(true); sendCurrentFilter(); });
     connection.on('data', message => {
       if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_SHUTTER') {
-        runSyncedCapture(message.sessionId, message.count);
+        if (typeof message.sessionId === 'string' && message.sessionId.length <= 64 && [1, 4].includes(Number(message.count))) runSyncedCapture(message.sessionId, message.count);
         return;
       }
       if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_PHOTO_CHUNK') {
+        if (typeof message.sessionId !== 'string' || message.sessionId.length > 64 || !Number.isInteger(message.index) || message.index < 0 || message.index > 3 || !Number.isInteger(message.total) || message.total < 1 || message.total > 128 || !Number.isInteger(message.part) || message.part < 0 || message.part >= message.total || typeof message.data !== 'string' || message.data.length > 16000) return;
         const key = message.sessionId + ':' + message.index;
         let packet = syncChunksRef.current.get(key);
         if (!packet) {
-          packet = { parts: new Array(message.total), received: 0, filter: message.filter || 'Original' };
+          if (syncChunksRef.current.size >= 16) return;
+          packet = { parts: new Array(message.total), received: 0, filter: FILTERS.some(filter => filter.name === message.filter) ? message.filter : 'Original' };
           syncChunksRef.current.set(key, packet);
         }
         if (packet.parts[message.part] == null) {
@@ -383,7 +426,8 @@ function App() {
       }
       if (message && typeof message === 'object' && message.type === 'Y2K_FILTER') {
         const valid = FILTERS.some(filter => filter.name === message.name);
-        if (valid) setRemoteFilter({ name: message.name, intensity: Math.max(0, Math.min(100, Number(message.intensity) || 0)) });
+        const strength = Number(message.intensity);
+        if (valid && Number.isFinite(strength)) setRemoteFilter({ name: message.name, intensity: Math.max(0, Math.min(100, strength)) });
       }
     });
     connection.on('close', () => {
@@ -416,9 +460,16 @@ function App() {
         setRoomStatus('waiting');
       });
       peer.on('call', call => {
+        if (approvedPeerRef.current && approvedPeerRef.current !== call.peer) { call.close(); return; }
+        if (callRef.current || incomingCallRef.current) { call.close(); return; }
+        incomingCallRef.current = call;
         setIncomingCall(call);
       });
-      peer.on('connection', connection => { if (approvedPeerRef.current === connection.peer) setupDataConnection(connection); else pendingConnectionsRef.current.push(connection); });
+      peer.on('connection', connection => {
+        if (approvedPeerRef.current === connection.peer) setupDataConnection(connection);
+        else if (pendingConnectionsRef.current.length < 4) pendingConnectionsRef.current.push(connection);
+        else connection.close();
+      });
       peer.on('error', error => {
         setRoomError(error.type === 'unavailable-id' ? 'Could not create a room. Please try again.' : (error.message || 'Room connection error.'));
         setRoomStatus('error');
@@ -459,8 +510,9 @@ function App() {
   };
 
   const acceptIncomingCall = () => {
-    if (!incomingCall || !streamRef.current) return;
+    if (!incomingCall || !streamRef.current || (approvedPeerRef.current && approvedPeerRef.current !== incomingCall.peer)) return;
     const approvedPeer = incomingCall.peer;
+    incomingCallRef.current = null;
     approvedPeerRef.current = approvedPeer;
     incomingCall.answer(streamRef.current);
     attachRemoteCall(incomingCall);
@@ -471,6 +523,7 @@ function App() {
 
   const rejectIncomingCall = () => {
     const rejectedPeer = incomingCall?.peer;
+    incomingCallRef.current = null;
     incomingCall?.close();
     pendingConnectionsRef.current.filter(connection => connection.peer === rejectedPeer).forEach(connection => connection.close());
     pendingConnectionsRef.current = pendingConnectionsRef.current.filter(connection => connection.peer !== rejectedPeer);
@@ -559,7 +612,9 @@ function App() {
     pendingConnectionsRef.current.forEach(connection => connection.close());
     pendingConnectionsRef.current = [];
     approvedPeerRef.current = '';
+    incomingCallRef.current = null;
     isRoomHostRef.current = false;
+    setConnectionQuality({ level: 'checking', label: 'CHECKING', detail: 'Waiting for media connection' });
     setRemoteReady(false);
     setRemoteStream(null);
     setRemoteFilter({ name: 'Original', intensity: 100 });
@@ -776,7 +831,7 @@ function App() {
           </section>}
         {activeTab === 'together' && <section className="together-panel">
           <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><span className="mono-label">PRIVATE ROOM</span></div>
-          <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
+          <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span>{roomStatus==='connected' && <span className={'connection-quality quality-'+connectionQuality.level} title={connectionQuality.detail}><i></i><b>{connectionQuality.label}</b><small>{connectionQuality.detail}</small></span>}</div>
           {roomStatus==='idle' || roomStatus==='error' ? <div className="room-entry">
             <div className="room-create"><span className="room-number">01 / HOST</span><h3>Start a private room</h3><p>Generate a 6-character code to share with your person.</p><button className="primary-button" onClick={createRoom}>GENERATE ROOM CODE ↗</button></div>
             <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Enter the 6-character code they sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0,6))} placeholder="e.g. K7M2QX" maxLength={6} autoComplete="off" /><button className="secondary-room-button" onClick={joinRoom}>JOIN ROOM ↗</button></div>
