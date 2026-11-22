@@ -47,6 +47,7 @@ const FILTERS = [
 ];
 
 const GROUPS = ['ALL', 'Y2K', 'FILM', 'COLOR', 'DREAM', 'RETRO', 'ODD', 'MOOD', 'MONO'];
+const THEMES = [['Silver 2004','silver'],['Bubblegum','bubblegum'],['Cyber Lime','cyber-lime'],['Midnight Blue','midnight-blue'],['Cherry Chrome','cherry-chrome'],['Lavender Haze','lavender-haze'],['Sunset Blvd','sunset'],['Mint Condition','mint'],['Violet Arcade','violet'],['Desert Sand','desert'],['Toxic Green','toxic'],['Ocean Drive','ocean'],['Cocoa Club','cocoa'],['Red Alert','red'],['Mono Noir','noir']].map(([name,id])=>({name,id}));
 const cx = (...items) => items.filter(Boolean).join(' ');
 
 function filterAtIntensity(filter, strength) {
@@ -98,6 +99,19 @@ function App() {
   const [roomMode, setRoomMode] = useState('call');
   const [incomingCall, setIncomingCall] = useState(null);
   const [remoteFilter, setRemoteFilter] = useState({ name: 'Original', intensity: 100 });
+  const [settingsOpen,setSettingsOpen]=useState(true);
+  const [theme,setTheme]=useState('silver');
+  const [devices,setDevices]=useState({audioinput:[],videoinput:[],audiooutput:[]});
+  const [micEnabled,setMicEnabled]=useState(true);
+  const [videoEnabled,setVideoEnabled]=useState(true);
+  const [audioInput,setAudioInput]=useState('');
+  const [videoInput,setVideoInput]=useState('');
+  const [audioOutput,setAudioOutput]=useState('');
+  const [mirrorPreview,setMirrorPreview]=useState(true);
+  const [showGrid,setShowGrid]=useState(false);
+  const [dateStamp,setDateStamp]=useState(false);
+  const [exposure,setExposure]=useState(0);
+  const [lowLight,setLowLight]=useState(false);
 
   const activeFilter = useMemo(() => FILTERS.find(f => f.name === selected) || FILTERS[0], [selected]);
   const visibleFilters = useMemo(() => group === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === group), [group]);
@@ -136,6 +150,13 @@ function App() {
   }, [facing, stopCamera]);
 
   useEffect(() => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    const refresh=()=>navigator.mediaDevices.enumerateDevices().then(list=>setDevices({audioinput:list.filter(d=>d.kind==='audioinput'),videoinput:list.filter(d=>d.kind==='videoinput'),audiooutput:list.filter(d=>d.kind==='audiooutput')})).catch(()=>{});
+    refresh(); navigator.mediaDevices.addEventListener?.('devicechange',refresh);
+    return ()=>navigator.mediaDevices.removeEventListener?.('devicechange',refresh);
+  }, []);
+
+  useEffect(() => {
     startCamera('user');
     return () => {
       peerRef.current?.destroy();
@@ -156,6 +177,33 @@ function App() {
       remoteVideoRef.current.play().catch(() => {});
     }
   }, [remoteStream, remoteReady]);
+
+  const toggleMic=async()=>{
+    try{
+      const next=!micEnabled; let stream=streamRef.current;
+      if(next&&!stream?.getAudioTracks().length){
+        const fresh=await navigator.mediaDevices.getUserMedia({audio:audioInput?{deviceId:{exact:audioInput}}:true,video:false});
+        const track=fresh.getAudioTracks()[0]; stream?.addTrack(track);
+        if(callRef.current?.peerConnection&&stream)callRef.current.peerConnection.addTrack(track,stream);
+      }
+      streamRef.current?.getAudioTracks().forEach(t=>t.enabled=next);setMicEnabled(next);
+    }catch{setRoomError('Microphone permission is unavailable.');}
+  };
+  const toggleVideo=()=>{const next=!videoEnabled;streamRef.current?.getVideoTracks().forEach(t=>t.enabled=next);setVideoEnabled(next);};
+  const changeInput=async(kind,id)=>{
+    if(!id)return;
+    try{
+      const old=streamRef.current;
+      const constraints=kind==='video'?{video:{deviceId:{exact:id},width:{ideal:1280},height:{ideal:720}},audio:!!old?.getAudioTracks().length}:{audio:{deviceId:{exact:id}},video:!!old?.getVideoTracks().length};
+      const fresh=await navigator.mediaDevices.getUserMedia(constraints);
+      const track=kind==='video'?fresh.getVideoTracks()[0]:fresh.getAudioTracks()[0];
+      const previous=kind==='video'?old?.getVideoTracks()[0]:old?.getAudioTracks()[0];
+      if(previous){old.removeTrack(previous);previous.stop();} if(old)old.addTrack(track);else streamRef.current=fresh;
+      if(kind==='video'){setVideoInput(id);[videoRef.current,localRoomVideoRef.current].forEach(v=>{if(v){v.srcObject=streamRef.current;v.play().catch(()=>{});}});}else{setAudioInput(id);setMicEnabled(true);}
+      const sender=callRef.current?.peerConnection?.getSenders?.().find(s=>s.track?.kind===kind);if(sender)await sender.replaceTrack(track);
+    }catch{setRoomError('Could not switch to that device.');}
+  };
+  const changeOutput=async id=>{setAudioOutput(id);if(remoteVideoRef.current?.setSinkId){try{await remoteVideoRef.current.setSinkId(id);}catch{setRoomError('Could not switch audio output.');}}else setRoomError('Audio output selection is unsupported in this browser.');};
 
   const playShutter = () => {
     if (!sound) return;
@@ -443,7 +491,7 @@ function App() {
   const deleteGalleryItem = id => setGallery(old => old.filter(item => item.id !== id));
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       <header className="topbar">
         <a className="brand" href="#" aria-label="Y2K Camera home">
           <span className="brand-mark">✳</span><span>Y2K<span className="brand-light">CAMERA</span></span>
@@ -470,7 +518,10 @@ function App() {
               </div>
               <div className="viewfinder-wrap">
                 <div className="viewfinder">
-                  <video ref={videoRef} className={cx('camera-video', facing === 'user' && 'mirrored')} style={liveStyle} playsInline muted />
+                  <video ref={videoRef} className={cx('camera-video', mirrorPreview && facing === 'user' && 'mirrored')} style={{...liveStyle,filter:filterAtIntensity(activeFilter.css,intensity)+' brightness('+(1+exposure/100)+')'}} playsInline muted />
+                  {showGrid && <div className="composition-grid"><i/><i/><i/><i/></div>}
+                  {dateStamp && <div className="date-stamp">{new Date().toLocaleDateString()}</div>}
+                  {lowLight && <div className="lowlight-overlay">LOW LIGHT PREVIEW</div>}
                   {!cameraReady && <div className="camera-placeholder"><span className="placeholder-icon">▧</span><strong>YOUR CAMERA GOES HERE</strong><small>ALLOW CAMERA ACCESS TO BEGIN</small></div>}
                   <div className="viewfinder-overlay">
                     <span className="rec-label"><i></i> REC</span>
@@ -525,6 +576,26 @@ function App() {
           </aside>
         </div>
 
+        <aside className="settings-column">
+          <div className="section-head"><span><i className="tiny-square pink"></i> SETTINGS & THEMES</span><button className="text-button" onClick={()=>setSettingsOpen(!settingsOpen)}>{settingsOpen?'HIDE':'SHOW'}</button></div>
+          {settingsOpen && <div className="settings-panel">
+            <section className="settings-section"><span className="settings-kicker">CALL CONTROLS</span>
+              <div className="device-actions"><button className={cx('device-toggle',micEnabled&&'enabled')} onClick={toggleMic}>♫ {micEnabled?'MIC ON':'MIC OFF'}</button><button className={cx('device-toggle',videoEnabled&&'enabled')} onClick={toggleVideo}>▣ {videoEnabled?'VIDEO ON':'VIDEO OFF'}</button></div>
+              <label className="setting-label">MICROPHONE INPUT</label><select value={audioInput} onChange={e=>changeInput('audio',e.target.value)}><option value="">System default</option>{devices.audioinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Microphone '+(i+1)}</option>)}</select>
+              <label className="setting-label">CAMERA INPUT</label><select value={videoInput} onChange={e=>changeInput('video',e.target.value)}><option value="">Current camera</option>{devices.videoinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Camera '+(i+1)}</option>)}</select>
+              <label className="setting-label">AUDIO OUTPUT</label><select value={audioOutput} onChange={e=>changeOutput(e.target.value)}><option value="">System default</option>{devices.audiooutput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Speaker '+(i+1)}</option>)}</select>
+            </section>
+            <section className="settings-section"><span className="settings-kicker">15 INTERFACE THEMES</span><div className="theme-grid">{THEMES.map(t=><button key={t.id} className={cx('theme-swatch',theme===t.id&&'active')} data-swatch={t.id} onClick={()=>setTheme(t.id)}><i/><span>{t.name}</span></button>)}</div></section>
+            <section className="settings-section"><span className="settings-kicker">CAMERA & BASIC OPTIONS</span>
+              <label className="setting-check"><input type="checkbox" checked={mirrorPreview} onChange={e=>setMirrorPreview(e.target.checked)}/> Mirror selfie preview</label>
+              <label className="setting-check"><input type="checkbox" checked={showGrid} onChange={e=>setShowGrid(e.target.checked)}/> Rule-of-thirds grid</label>
+              <label className="setting-check"><input type="checkbox" checked={dateStamp} onChange={e=>setDateStamp(e.target.checked)}/> Date stamp overlay</label>
+              <label className="setting-check"><input type="checkbox" checked={lowLight} onChange={e=>setLowLight(e.target.checked)}/> Low-light preview aid</label>
+              <label className="setting-label">EXPOSURE <b>{exposure>0?'+':''}{exposure}</b></label><input className="setting-range" type="range" min="-40" max="40" value={exposure} onChange={e=>setExposure(Number(e.target.value))}/>
+              <button className="settings-reset" onClick={()=>{setTheme('silver');setMirrorPreview(true);setShowGrid(false);setDateStamp(false);setLowLight(false);setExposure(0);}}>RESET SETTINGS</button>
+            </section>
+          </div>}
+        </aside>
         {togetherOpen && <section className="together-panel">
           <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><button className="text-button" onClick={() => setTogetherOpen(false)}>CLOSE ×</button></div>
           <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
