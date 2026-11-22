@@ -306,6 +306,11 @@ function App() {
     streamRef.current = stream;
     if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
     setCameraReady(true);
+    navigator.mediaDevices?.enumerateDevices?.().then(list=>setDevices({
+      audioinput:list.filter(d=>d.kind==='audioinput'),
+      videoinput:list.filter(d=>d.kind==='videoinput'),
+      audiooutput:list.filter(d=>d.kind==='audiooutput')
+    })).catch(()=>{});
     return stream;
   };
 
