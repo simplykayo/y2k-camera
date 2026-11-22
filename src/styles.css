@@ -484,3 +484,14 @@ footer b{color:#245b91;margin-left:5px}
 }
 
 .app-shell>.topbar>.top-meta{display:none}
+
+
+/* Live WebRTC connection quality */
+.together-intro{flex-wrap:wrap}
+.connection-quality{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px 11px;border:1px solid var(--line,#d8d4cc);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#333);font:700 9px "Courier New",monospace;letter-spacing:.6px}
+.connection-quality i{width:8px;height:8px;border-radius:50%;background:#b38a36;box-shadow:0 0 0 3px #b38a361a}
+.connection-quality small{width:100%;padding-left:15px;color:var(--muted,#777);font:9px "Courier New",monospace;letter-spacing:0}
+.connection-quality.quality-good i{background:#259b67;box-shadow:0 0 0 3px #259b671a}
+.connection-quality.quality-fair i{background:#c28a25;box-shadow:0 0 0 3px #c28a251a}
+.connection-quality.quality-poor i{background:#c04444;box-shadow:0 0 0 3px #c044441a}
+.app-shell[data-style="meet"] .connection-quality{background:#fff;border-color:#dadce0;border-radius:9px;font-family:Arial,sans-serif;color:#3c4043}
