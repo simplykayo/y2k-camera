@@ -46,7 +46,7 @@ Camera frames are processed in the browser. There is no upload endpoint, account
 
 ## Notes
 
-The filter presets are implemented with native CSS/canvas color operations, without a paid API or image-processing service. Some effects are color treatments rather than geometric lens distortions. In Together Mode, the selected filter is applied to both video tiles locally on each viewer's screen.
+The filter presets are implemented with native CSS/canvas color operations, without a paid API or image-processing service. Some effects are color treatments rather than geometric lens distortions. In Together Mode, each person's selected filter and intensity are shared over the peer data channel and applied to that person's camera feed on the other viewer's screen.
 
 
 ## Together Mode
