@@ -48,7 +48,7 @@ const FILTERS = [
 
 const GROUPS = ['ALL', 'Y2K', 'FILM', 'COLOR', 'DREAM', 'RETRO', 'ODD', 'MOOD', 'MONO'];
 const THEMES = [['Silver 2004','silver'],['Bubblegum','bubblegum'],['Cyber Lime','cyber-lime'],['Midnight Blue','midnight-blue'],['Cherry Chrome','cherry-chrome'],['Lavender Haze','lavender-haze'],['Sunset Blvd','sunset'],['Mint Condition','mint'],['Violet Arcade','violet'],['Desert Sand','desert'],['Toxic Green','toxic'],['Ocean Drive','ocean'],['Cocoa Club','cocoa'],['Red Alert','red'],['Mono Noir','noir']].map(([name,id])=>({name,id}));
-const STYLES = [{name:'Y2K Original',id:'y2k',description:'Chrome camera · retro controls'},{name:'Editorial',id:'editorial',description:'Clean magazine layout'},{name:'Studio',id:'studio',description:'Dark pro-photo workspace'},{name:'Terminal',id:'terminal',description:'Monospace cyber console'},{name:'Scrapbook',id:'scrapbook',description:'Printed memories · paper edges'},{name:'Minimal',id:'minimal',description:'Quiet, modern and spacious'}];
+const STYLES = [{name:'Y2K Camera',id:'y2k',description:'Retro point-and-shoot interface'},{name:'Editorial Magazine',id:'editorial',description:'A photo journal with a magazine layout'},{name:'Darkroom Studio',id:'studio',description:'A pro camera workstation'},{name:'Terminal OS',id:'terminal',description:'A retro computer interface'},{name:'Scrapbook',id:'scrapbook',description:'A tactile memory book'},{name:'Minimal Modern',id:'minimal',description:'A clean, borderless camera app'}];
 const cx = (...items) => items.filter(Boolean).join(' ');
 
 function filterAtIntensity(filter, strength) {
