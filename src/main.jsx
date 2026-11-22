@@ -210,11 +210,39 @@ function App() {
     });
     ctx.fillStyle = '#77717c'; ctx.font = '22px monospace'; ctx.textAlign = 'center';
     ctx.fillText('Y2K CAMERA  ·  ' + new Date().toLocaleDateString(), width/2, height-48);
-    download(canvas.toDataURL('image/png'), 'y2k-camera-strip.png');
+    await saveImage(canvas.toDataURL('image/png'), 'y2k-camera-strip.png');
   };
 
-  const download = (data, filename) => {
-    const a = document.createElement('a'); a.href = data; a.download = filename; a.click();
+  const saveImage = async (data, filename) => {
+    try {
+      const response = await fetch(data);
+      const blob = await response.blob();
+      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+
+      // On phones, use the native share sheet so the user can choose Save Image,
+      // Photos, Files, or another destination.
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+
+      // Desktop and browsers without file sharing: trigger a real Blob download.
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      // Last-resort fallback: open the image itself so it can be saved manually.
+      const tab = window.open();
+      if (tab) tab.document.write('<img alt="Your Y2K Camera photo" style="max-width:100%;height:auto" src="' + data + '"/>');
+      else window.alert('Your browser blocked the save action. Allow pop-ups for this site, then try again.');
+    }
   };
 
   const switchCamera = async () => {
@@ -312,14 +340,14 @@ function App() {
         <section className="results-section">
           <div className="section-head"><span><i className="tiny-square"></i> YOUR CONTACT SHEET</span><span className="mono-label">{shots.length} / 4 FRAMES</span></div>
           <div className="contact-sheet">
-            {shots.length === 0 ? <div className="empty-sheet"><span>▧</span><strong>NOTHING DEVELOPED YET</strong><small>YOUR NEXT FAVOURITE PHOTO MIGHT BE ONE CLICK AWAY.</small></div> : <div className="shot-list">{shots.slice(-4).map((shot,i)=><div className="shot-card" key={shot.id}><img src={shot.data} alt={'Photo '+(i+1)}/><div><span>FRAME 0{i+1}</span><b>{shot.filter}</b><button onClick={() => download(shot.data,'y2k-photo-'+(i+1)+'.jpg')}>SAVE ↗</button></div></div>)}</div>}
+            {shots.length === 0 ? <div className="empty-sheet"><span>▧</span><strong>NOTHING DEVELOPED YET</strong><small>YOUR NEXT FAVOURITE PHOTO MIGHT BE ONE CLICK AWAY.</small></div> : <div className="shot-list">{shots.slice(-4).map((shot,i)=><div className="shot-card" key={shot.id}><img src={shot.data} alt={'Photo '+(i+1)}/><div><span>FRAME 0{i+1}</span><b>{shot.filter}</b><button onClick={() => saveImage(shot.data,'y2k-photo-'+(i+1)+'.jpg')}>SAVE ↗</button></div></div>)}</div>}
             <div className="sheet-actions"><button className="text-button" onClick={clearShots} disabled={!shots.length}>CLEAR FRAMES</button><button className="primary-button" onClick={makeStrip} disabled={!shots.length}>DOWNLOAD STRIP <span>↗</span></button></div>
           </div>
         </section>
 
         {showGallery && <section className="gallery-section">
           <div className="section-head"><span><i className="tiny-square pink"></i> MY CAMERA ROLL</span><button className="text-button" onClick={() => setShowGallery(false)}>CLOSE ×</button></div>
-          {gallery.length===0 ? <p className="gallery-empty">Your roll is empty. Go make a moment.</p> : <div className="gallery-grid">{gallery.map(item=><div className="gallery-item" key={item.id}><img src={item.data} alt="Saved camera roll photo"/><div><span>{item.filter}</span><button onClick={()=>download(item.data,'y2k-'+item.id+'.jpg')}>↓</button><button onClick={()=>deleteGalleryItem(item.id)}>×</button></div></div>)}</div>}
+          {gallery.length===0 ? <p className="gallery-empty">Your roll is empty. Go make a moment.</p> : <div className="gallery-grid">{gallery.map(item=><div className="gallery-item" key={item.id}><img src={item.data} alt="Saved camera roll photo"/><div><span>{item.filter}</span><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>↓</button><button onClick={()=>deleteGalleryItem(item.id)}>×</button></div></div>)}</div>}
         </section>}
       </main>
 
