@@ -515,7 +515,7 @@ function App() {
   };
 
   const syncShutter = () => {
-    if (syncBusyRef.current || !remoteReady || !dataReady) return;
+    if (syncBusyRef.current || syncRunning || !remoteReady || !dataReady) return;
     syncBusyRef.current = true;
     setSyncRunning(true);
     const sessionId = crypto.randomUUID();
