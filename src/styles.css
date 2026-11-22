@@ -277,3 +277,28 @@ footer b{color:#245b91;margin-left:5px}
 .app-shell[data-theme] .filter-tabs button.active,.app-shell[data-theme] .primary-button,.app-shell[data-theme] .room-view-tabs button.active{background:var(--theme-accent);color:var(--theme-on-accent);border-color:var(--theme-accent)}
 .app-shell[data-theme] .filter-name,.app-shell[data-theme] .shot-card b{color:var(--theme-text)}
 .app-shell[data-theme] .filter-group,.app-shell[data-theme] .mini-kicker{color:var(--theme-muted)}
+
+/* Each skin also changes the interface finish, not only its palette. */
+.app-shell[data-theme="bubblegum"] .settings-column,.app-shell[data-theme="bubblegum"] .filter-panel{border-radius:18px}
+.app-shell[data-theme="bubblegum"] .primary-button,.app-shell[data-theme="bubblegum"] .top-pill{border-radius:20px}
+.app-shell[data-theme="cyber-lime"] .section-head,.app-shell[data-theme="cyber-lime"] .settings-kicker{letter-spacing:2px;text-transform:uppercase}
+.app-shell[data-theme="cyber-lime"] .settings-section{border-style:dashed}
+.app-shell[data-theme="midnight-blue"] .camera-shell,.app-shell[data-theme="midnight-blue"] .settings-column{box-shadow:0 0 24px #66baff30,inset 0 0 0 1px #9ccfff33}
+.app-shell[data-theme="midnight-blue"] .top-pill,.app-shell[data-theme="midnight-blue"] .filter-tile{box-shadow:inset 0 0 12px #8cc8ff18}
+.app-shell[data-theme="cherry-chrome"] .camera-shell{background:linear-gradient(135deg,#fff0f0,#bd8b94,#f8dfe2)}
+.app-shell[data-theme="cherry-chrome"] .section-head{border-bottom:1px solid #b47b84}
+.app-shell[data-theme="lavender-haze"] .settings-section,.app-shell[data-theme="lavender-haze"] .filter-panel{border-radius:12px;box-shadow:0 5px 18px #7253a51c}
+.app-shell[data-theme="sunset"] .intro h1{letter-spacing:-1.5px}
+.app-shell[data-theme="sunset"] .camera-shell{background:linear-gradient(145deg,#fff0dd,#e9a47c,#f9d6b7)}
+.app-shell[data-theme="mint"] .settings-section,.app-shell[data-theme="mint"] .contact-sheet{border-radius:5px}
+.app-shell[data-theme="mint"] .primary-button{border-radius:3px;box-shadow:0 3px 0 #17634d}
+.app-shell[data-theme="violet"] .camera-shell,.app-shell[data-theme="violet"] .settings-column{box-shadow:0 0 26px #d49aff24,inset 0 0 0 1px #d49aff35}
+.app-shell[data-theme="desert"] .settings-section,.app-shell[data-theme="desert"] .filter-panel{background-image:repeating-linear-gradient(0deg,transparent,transparent 5px,#78502a08 6px)}
+.app-shell[data-theme="toxic"] .section-head,.app-shell[data-theme="toxic"] .settings-kicker{font-weight:bold;text-shadow:0 0 10px #c3ff5540}
+.app-shell[data-theme="toxic"] .camera-shell{border:2px solid #91bd3d}
+.app-shell[data-theme="ocean"] .settings-column,.app-shell[data-theme="ocean"] .filter-panel{background-image:linear-gradient(145deg,#e7f9fa99,#65b6c433)}
+.app-shell[data-theme="cocoa"] .intro h1,.app-shell[data-theme="cocoa"] .filter-current h2{font-family:Georgia,serif;letter-spacing:-1px}
+.app-shell[data-theme="red"] .section-head{border-bottom:2px solid #9b1f26;padding-bottom:7px}
+.app-shell[data-theme="red"] .primary-button{box-shadow:3px 3px 0 #65151b}
+.app-shell[data-theme="noir"] .camera-shell,.app-shell[data-theme="noir"] .settings-column{box-shadow:0 0 0 1px #777,inset 0 0 0 1px #ffffff18}
+.app-shell[data-theme="noir"] .filter-thumb{filter:grayscale(1)}
