@@ -48,7 +48,7 @@ const FILTERS = [
 
 const GROUPS = ['ALL', 'Y2K', 'FILM', 'COLOR', 'DREAM', 'RETRO', 'ODD', 'MOOD', 'MONO'];
 const THEMES = [['Silver 2004','silver'],['Bubblegum','bubblegum'],['Cyber Lime','cyber-lime'],['Midnight Blue','midnight-blue'],['Cherry Chrome','cherry-chrome'],['Lavender Haze','lavender-haze'],['Sunset Blvd','sunset'],['Mint Condition','mint'],['Violet Arcade','violet'],['Desert Sand','desert'],['Toxic Green','toxic'],['Ocean Drive','ocean'],['Cocoa Club','cocoa'],['Red Alert','red'],['Mono Noir','noir']].map(([name,id])=>({name,id}));
-const STYLES = [{name:'Y2K Camera',id:'y2k',description:'Retro point-and-shoot interface'},{name:'Editorial Magazine',id:'editorial',description:'A photo journal with a magazine layout'},{name:'Darkroom Studio',id:'studio',description:'A pro camera workstation'},{name:'Terminal OS',id:'terminal',description:'A retro computer interface'},{name:'Scrapbook',id:'scrapbook',description:'A tactile memory book'},{name:'Minimal Modern',id:'minimal',description:'A clean, borderless camera app'}];
+const STYLES = [{name:'Y2K Camera',id:'y2k',description:'Retro point-and-shoot interface'},{name:'Editorial Magazine',id:'editorial',description:'A photo journal with a magazine layout'},{name:'Darkroom Studio',id:'studio',description:'A pro camera workstation'},{name:'Terminal OS',id:'terminal',description:'A retro computer interface'},{name:'Scrapbook',id:'scrapbook',description:'A tactile memory book'},{name:'Minimal Modern',id:'minimal',description:'A clean, borderless camera app'},{name:'Google Meet',id:'meet',description:'A familiar, clean video meeting layout'}];
 const cx = (...items) => items.filter(Boolean).join(' ');
 
 function filterAtIntensity(filter, strength) {
@@ -89,6 +89,8 @@ function App() {
   const remoteVideoRef = useRef(null);
   const localRoomVideoRef = useRef(null);
   const dataConnectionsRef = useRef([]);
+  const pendingConnectionsRef = useRef([]);
+  const approvedPeerRef = useRef('');
   const [togetherOpen, setTogetherOpen] = useState(false);
   const [roomStatus, setRoomStatus] = useState('idle');
   const [roomCode, setRoomCode] = useState('');
@@ -114,6 +116,9 @@ function App() {
   const [dateStamp,setDateStamp]=useState(false);
   const [exposure,setExposure]=useState(0);
   const [lowLight,setLowLight]=useState(false);
+  const [cameraQuality,setCameraQuality]=useState('720p');
+  const [previewRatio,setPreviewRatio]=useState('16/9');
+  const [meetingMessage,setMeetingMessage]=useState('');
 
   const activeFilter = useMemo(() => FILTERS.find(f => f.name === selected) || FILTERS[0], [selected]);
   const visibleFilters = useMemo(() => group === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === group), [group]);
@@ -134,10 +139,8 @@ function App() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: direction }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-      });
+      const [qualityWidth, qualityHeight] = cameraQuality === '1080p' ? [1920,1080] : cameraQuality === '480p' ? [854,480] : [1280,720];
+      const stream = await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:direction},width:{ideal:qualityWidth},height:{ideal:qualityHeight}}});
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -149,7 +152,7 @@ function App() {
         ? 'Camera permission was blocked. Allow camera access in your browser settings, then try again.'
         : 'Could not start the camera. Check that it is connected and not being used by another app.');
     }
-  }, [facing, stopCamera]);
+  }, [facing, stopCamera, cameraQuality]);
 
   useEffect(() => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -317,6 +320,7 @@ function App() {
   };
 
   const setupDataConnection = connection => {
+    if (approvedPeerRef.current !== connection.peer) { pendingConnectionsRef.current.push(connection); return; }
     dataConnectionsRef.current.push(connection);
     const sendCurrentFilter = () => connection.send({ type: 'Y2K_FILTER', name: selected, intensity });
     if (connection.open) { setDataReady(true); sendCurrentFilter(); }
@@ -357,7 +361,7 @@ function App() {
       peer.on('call', call => {
         setIncomingCall(call);
       });
-      peer.on('connection', setupDataConnection);
+      peer.on('connection', connection => { if (approvedPeerRef.current === connection.peer) setupDataConnection(connection); else pendingConnectionsRef.current.push(connection); });
       peer.on('error', error => {
         setRoomError(error.type === 'unavailable-id' ? 'Could not create a room. Please try again.' : (error.message || 'Room connection error.'));
         setRoomStatus('error');
@@ -397,13 +401,20 @@ function App() {
 
   const acceptIncomingCall = () => {
     if (!incomingCall || !streamRef.current) return;
+    const approvedPeer = incomingCall.peer;
+    approvedPeerRef.current = approvedPeer;
     incomingCall.answer(streamRef.current);
     attachRemoteCall(incomingCall);
+    pendingConnectionsRef.current.filter(connection => connection.peer === approvedPeer).forEach(setupDataConnection);
+    pendingConnectionsRef.current = pendingConnectionsRef.current.filter(connection => connection.peer !== approvedPeer);
     setIncomingCall(null);
   };
 
   const rejectIncomingCall = () => {
+    const rejectedPeer = incomingCall?.peer;
     incomingCall?.close();
+    pendingConnectionsRef.current.filter(connection => connection.peer === rejectedPeer).forEach(connection => connection.close());
+    pendingConnectionsRef.current = pendingConnectionsRef.current.filter(connection => connection.peer !== rejectedPeer);
     setIncomingCall(null);
   };
 
@@ -428,6 +439,9 @@ function App() {
     peerRef.current = null;
     callRef.current = null;
     dataConnectionsRef.current = [];
+    pendingConnectionsRef.current.forEach(connection => connection.close());
+    pendingConnectionsRef.current = [];
+    approvedPeerRef.current = '';
     setRemoteReady(false);
     setRemoteStream(null);
     setRemoteFilter({ name: 'Original', intensity: 100 });
@@ -442,9 +456,17 @@ function App() {
   };
 
   const copyRoomCode = async () => {
-    try { await navigator.clipboard.writeText(roomCode); }
+    try { await navigator.clipboard.writeText(roomCode); setMeetingMessage('Room code copied.'); }
     catch { setRoomError('Could not copy automatically. Select and copy the room code.'); }
   };
+  const copyInvite = async () => { try { await navigator.clipboard.writeText('Join my private camera room: '+roomCode+'\nOpen '+window.location.origin+' and enter this 6-character code.'); setMeetingMessage('Invite message copied.'); } catch { setRoomError('Could not copy the invite.'); } };
+  const toggleFullscreen = async () => { try { if(document.fullscreenElement) await document.exitFullscreen(); else await document.querySelector('.viewfinder')?.requestFullscreen(); } catch { setRoomError('Fullscreen is unavailable in this browser.'); } };
+  const togglePiP = async () => { try { const video=videoRef.current; if(document.pictureInPictureElement) await document.exitPictureInPicture(); else if(video?.requestPictureInPicture) await video.requestPictureInPicture(); else setRoomError('Picture-in-picture is not supported here.'); } catch { setRoomError('Could not open picture-in-picture.'); } };
+  const testSpeaker = () => { try { const Ctx=window.AudioContext||window.webkitAudioContext; const ctx=new Ctx(); const osc=ctx.createOscillator(); const gain=ctx.createGain(); osc.frequency.value=660; gain.gain.value=.08; osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime+.35); osc.onended=()=>ctx.close(); } catch { setRoomError('Speaker test is unavailable.'); } };
+  const undoLastShot = () => { const last=shots[shots.length-1]; if(!last)return; setShots(old=>old.slice(0,-1)); setGallery(old=>old.filter(item=>item.id!==last.id)); };
+  const downloadAllPhotos = () => { gallery.forEach((item,index)=>window.setTimeout(()=>saveImage(item.data,'y2k-photo-'+(index+1)+'.jpg'),index*400)); };
+  const clearGallery = () => { if(window.confirm('Delete every photo in your camera roll? This cannot be undone.')) setGallery([]); };
+  useEffect(() => { const onKey=e=>{ if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)||e.ctrlKey||e.metaKey||e.altKey)return; if(e.key.toLowerCase()==='m'){e.preventDefault();toggleMic();} else if(e.key.toLowerCase()==='v'){e.preventDefault();toggleVideo();} else if(e.key.toLowerCase()==='f'){e.preventDefault();toggleFullscreen();} else if(e.key===' '&&!e.repeat){e.preventDefault();handleMainShutter();} }; window.addEventListener('keydown',onKey); return()=>window.removeEventListener('keydown',onKey); });
 
 
   const makeStrip = async () => {
@@ -533,7 +555,7 @@ function App() {
                 <span className="camera-model">DIGITAL STILL CAMERA<br/>5.0 MEGAPIXELS</span>
               </div>
               <div className="viewfinder-wrap">
-                <div className="viewfinder">
+                <div className="viewfinder" style={{aspectRatio:previewRatio}}>
                   <video ref={videoRef} className={cx('camera-video', mirrorPreview && facing === 'user' && 'mirrored')} style={{...liveStyle,filter:filterAtIntensity(activeFilter.css,intensity)+' brightness('+(1+exposure/100)+')'}} playsInline muted />
                   {showGrid && <div className="composition-grid"><i/><i/><i/><i/></div>}
                   {dateStamp && <div className="date-stamp">{new Date().toLocaleDateString()}</div>}
@@ -566,8 +588,10 @@ function App() {
               <button className={cx('meet-control', videoEnabled && 'is-on')} onClick={toggleVideo} aria-pressed={videoEnabled} title={videoEnabled ? 'Turn camera off' : 'Turn camera on'}>
                 <span className="meet-control-icon">{videoEnabled ? '▣' : '▧'}</span><span>{videoEnabled ? 'CAMERA ON' : 'CAMERA OFF'}</span>
               </button>
-              <span className="meet-controls-note">CALL CONTROLS</span>
+              <span className="meet-controls-note">M MIC · V VIDEO · F FULLSCREEN · SPACE SNAP</span>
             </div>
+            <div className="quick-tools"><button onClick={toggleFullscreen}>⛶ Fullscreen</button><button onClick={togglePiP}>▣ Picture-in-picture</button><button onClick={testSpeaker}>♫ Test speaker</button><button onClick={undoLastShot} disabled={!shots.length}>↶ Undo last</button></div>
+            <div className="capture-preferences"><label>CAMERA QUALITY<select value={cameraQuality} onChange={e=>{setCameraQuality(e.target.value);startCamera(facing);}}><option value="480p">480p · Low data</option><option value="720p">720p · Balanced</option><option value="1080p">1080p · High</option></select></label><label>PREVIEW SHAPE<select value={previewRatio} onChange={e=>setPreviewRatio(e.target.value)}><option value="16/9">Widescreen</option><option value="4/3">Classic</option><option value="1/1">Square</option></select></label></div>
             {cameraError && <div className="camera-error"><span>!</span>{cameraError}<button onClick={() => startCamera(facing)}>TRY AGAIN ↗</button></div>}
             <div className="shoot-controls">
               <div className="control-block">
@@ -613,7 +637,7 @@ function App() {
             <div className="room-create"><span className="room-number">01 / HOST</span><h3>Start a private room</h3><p>Generate a 6-character code to share with your person.</p><button className="primary-button" onClick={createRoom}>GENERATE ROOM CODE ↗</button></div>
             <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Enter the 6-character code they sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0,6))} placeholder="e.g. K7M2QX" maxLength={6} autoComplete="off" /><button className="secondary-room-button" onClick={joinRoom}>JOIN ROOM ↗</button></div>
           </div> : <div className="room-active">
-            {roomCode && <div className="invite-box"><div><span className="room-number">YOUR ROOM CODE</span><code className="room-code-display">{roomCode}</code></div><button className="primary-button" onClick={copyRoomCode}>COPY CODE ↗</button></div>}
+            {roomCode && <div className="invite-box"><div><span className="room-number">YOUR ROOM CODE</span><code className="room-code-display">{roomCode}</code></div><button className="primary-button" onClick={copyRoomCode}>COPY CODE ↗</button><button className="secondary-room-button" onClick={copyInvite}>COPY INVITE MESSAGE</button></div>}
             {incomingCall && <div className="incoming-invite"><div><b>♡ SOMEONE WANTS TO JOIN</b><span>They are asking to join your private camera room.</span></div><button className="primary-button" onClick={acceptIncomingCall}>ACCEPT ↗</button><button className="secondary-room-button" onClick={rejectIncomingCall}>DECLINE ×</button></div>}
             <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
             <div className="room-feeds">
@@ -622,7 +646,7 @@ function App() {
             </div>
             {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Pick your filter and timer in the camera studio, then capture both cameras at once.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
           </div>}
-          {roomError && <div className="room-error">{roomError}</div>}
+          {roomError && <div className="room-error">{roomError}</div>}{meetingMessage && <div className="room-success" role="status">{meetingMessage}</div>}
           <div className="room-privacy">⌑ SHARE CODE ONLY WITH YOUR PERSON <span>·</span> HOST APPROVAL REQUIRED <span>·</span> VIDEO IS PEER-TO-PEER</div>
         </section>}
         <section className="results-section">
@@ -635,7 +659,7 @@ function App() {
 
         {showGallery && <section className="gallery-section">
           <div className="section-head"><span><i className="tiny-square pink"></i> MY CAMERA ROLL</span><button className="text-button" onClick={() => setShowGallery(false)}>CLOSE ×</button></div>
-          {gallery.length===0 ? <p className="gallery-empty">Your roll is empty. Go make a moment.</p> : <div className="gallery-grid">{gallery.map(item=><div className="gallery-item" key={item.id}><img src={item.data} alt="Saved camera roll photo"/><div><span>{item.filter}</span><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>↓</button><button onClick={()=>deleteGalleryItem(item.id)}>×</button></div></div>)}</div>}
+          {gallery.length===0 ? <p className="gallery-empty">Your roll is empty. Go make a moment.</p> : <div className="gallery-actions"><button onClick={downloadAllPhotos}>DOWNLOAD ALL ({gallery.length})</button><button onClick={clearGallery}>DELETE ALL</button></div><div className="gallery-grid">{gallery.map(item=><div className="gallery-item" key={item.id}><img src={item.data} alt="Saved camera roll photo"/><div><span>{item.filter}</span><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>↓</button><button onClick={()=>deleteGalleryItem(item.id)}>×</button></div></div>)}</div>}
         </section>}
       </main>
 
