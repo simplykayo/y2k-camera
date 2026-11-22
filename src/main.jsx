@@ -585,7 +585,6 @@ function App() {
               </div>
             </div>
           </aside>
-        </div>
 
         <aside className="settings-column">
           <div className="section-head"><span><i className="tiny-square pink"></i> SETTINGS & THEMES</span><button className="text-button" onClick={()=>setSettingsOpen(!settingsOpen)}>{settingsOpen?'HIDE':'SHOW'}</button></div>
@@ -607,6 +606,7 @@ function App() {
             </section>
           </div>}
         </aside>
+        </div>
         {togetherOpen && <section className="together-panel">
           <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><button className="text-button" onClick={() => setTogetherOpen(false)}>CLOSE ×</button></div>
           <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
