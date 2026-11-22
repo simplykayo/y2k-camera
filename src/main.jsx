@@ -92,7 +92,10 @@ function App() {
   const pendingConnectionsRef = useRef([]);
   const approvedPeerRef = useRef('');
   const isRoomHostRef = useRef(false);
-  const [togetherOpen, setTogetherOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('camera');
+  const [togetherSelected, setTogetherSelected] = useState('2004 Digicam');
+  const [togetherIntensity, setTogetherIntensity] = useState(100);
+  const [togetherGroup, setTogetherGroup] = useState('ALL');
   const [roomStatus, setRoomStatus] = useState('idle');
   const [roomCode, setRoomCode] = useState('');
   const [joinInput, setJoinInput] = useState('');
@@ -124,6 +127,8 @@ function App() {
   const activeFilter = useMemo(() => FILTERS.find(f => f.name === selected) || FILTERS[0], [selected]);
   const visibleFilters = useMemo(() => group === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === group), [group]);
   const remoteActiveFilter = useMemo(() => FILTERS.find(f => f.name === remoteFilter.name) || FILTERS[0], [remoteFilter.name]);
+  const togetherActiveFilter = useMemo(() => FILTERS.find(f => f.name === togetherSelected) || FILTERS[0], [togetherSelected]);
+  const togetherVisibleFilters = useMemo(() => togetherGroup === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === togetherGroup), [togetherGroup]);
   const liveStyle = { filter: filterAtIntensity(activeFilter.css, intensity), opacity: 1 };
 
   const stopCamera = useCallback(() => {
@@ -180,11 +185,11 @@ function App() {
   }, [cameraReady, roomStatus]);
 
   useEffect(() => {
-    if (cameraReady && togetherOpen && localRoomVideoRef.current && streamRef.current) {
+    if (cameraReady && activeTab === 'together' && localRoomVideoRef.current && streamRef.current) {
       localRoomVideoRef.current.srcObject = streamRef.current;
       localRoomVideoRef.current.play().catch(() => {});
     }
-  }, [cameraReady, togetherOpen, roomStatus]);
+  }, [cameraReady, activeTab, roomStatus]);
 
   useEffect(() => {
     if (remoteStream && remoteVideoRef.current) {
@@ -238,7 +243,7 @@ function App() {
     } catch {}
   };
 
-  const renderFrame = () => {
+  const renderFrame = (filterName = selected, filterStrength = intensity) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || !video.videoWidth) return null;
@@ -248,30 +253,31 @@ function App() {
     const ctx = canvas.getContext('2d');
     ctx.save();
     if (facing === 'user') { ctx.translate(width, 0); ctx.scale(-1, 1); }
-    ctx.filter = filterAtIntensity(activeFilter.css, intensity) + ' brightness(' + (1 + exposure/100) + ')';
+    const captureFilter = FILTERS.find(f => f.name === filterName) || FILTERS[0];
+    ctx.filter = filterAtIntensity(captureFilter.css, filterStrength) + ' brightness(' + (1 + exposure/100) + ')';
     ctx.drawImage(video, 0, 0, width, height);
     ctx.restore();
-    if (activeFilter.tint && activeFilter.alpha) {
+    if (captureFilter.tint && captureFilter.alpha) {
       ctx.save();
       ctx.globalCompositeOperation = activeFilter.blend || 'soft-light';
-      ctx.globalAlpha = activeFilter.alpha * (intensity / 100);
-      ctx.fillStyle = activeFilter.tint;
+      ctx.globalAlpha = captureFilter.alpha * (filterStrength / 100);
+      ctx.fillStyle = captureFilter.tint;
       ctx.fillRect(0, 0, width, height);
       ctx.restore();
     }
     return canvas.toDataURL('image/jpeg', .94);
   };
 
-  const takeOne = async () => {
-    const data = renderFrame();
+  const takeOne = async (filterName = selected, filterStrength = intensity) => {
+    const data = renderFrame(filterName, filterStrength);
     if (!data) return null;
-    const item = { id: crypto.randomUUID(), data, filter: selected, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) };
+    const item = { id: crypto.randomUUID(), data, filter: filterName, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) };
     setShots(old => [...old, item]);
     setGallery(old => [item, ...old]);
     return item;
   };
 
-  const takePhoto = async () => {
+  const takePhoto = async (filterName = selected, filterStrength = intensity) => {
     if (!cameraReady || busy) return;
     setBusy(true);
     const total = mode === 'strip' ? 4 : 1;
@@ -283,7 +289,7 @@ function App() {
       setTimer(0);
       setFlash(true); playShutter();
       await new Promise(resolve => setTimeout(resolve, 130));
-      await takeOne();
+      await takeOne(filterName, filterStrength);
       await new Promise(resolve => setTimeout(resolve, 520));
       setFlash(false);
       if (i < total - 1) await new Promise(resolve => setTimeout(resolve, 450));
@@ -323,11 +329,11 @@ function App() {
   const setupDataConnection = connection => {
     if (isRoomHostRef.current && approvedPeerRef.current !== connection.peer) { pendingConnectionsRef.current.push(connection); return; }
     dataConnectionsRef.current.push(connection);
-    const sendCurrentFilter = () => connection.send({ type: 'Y2K_FILTER', name: selected, intensity });
+    const sendCurrentFilter = () => connection.send({ type: 'Y2K_FILTER', name: togetherSelected, intensity: togetherIntensity });
     if (connection.open) { setDataReady(true); sendCurrentFilter(); }
     connection.on('open', () => { setDataReady(true); sendCurrentFilter(); });
     connection.on('data', message => {
-      if (message === 'Y2K_SYNC_SHUTTER') { takePhoto(); return; }
+      if (message === 'Y2K_SYNC_SHUTTER') { takePhoto(togetherSelected, togetherIntensity); return; }
       if (message && typeof message === 'object' && message.type === 'Y2K_FILTER') {
         const valid = FILTERS.some(filter => filter.name === message.name);
         if (valid) setRemoteFilter({ name: message.name, intensity: Math.max(0, Math.min(100, Number(message.intensity) || 0)) });
@@ -341,9 +347,9 @@ function App() {
 
   useEffect(() => {
     dataConnectionsRef.current.forEach(connection => {
-      if (connection.open) connection.send({ type: 'Y2K_FILTER', name: selected, intensity });
+      if (connection.open) connection.send({ type: 'Y2K_FILTER', name: togetherSelected, intensity: togetherIntensity });
     });
-  }, [selected, intensity]);
+  }, [togetherSelected, togetherIntensity]);
 
   const createRoom = async () => {
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
@@ -428,7 +434,7 @@ function App() {
     dataConnectionsRef.current.forEach(connection => {
       if (connection.open) connection.send('Y2K_SYNC_SHUTTER');
     });
-    takePhoto();
+    takePhoto(togetherSelected, togetherIntensity);
   };
 
   const handleMainShutter = () => {
@@ -547,12 +553,14 @@ function App() {
           <span className="brand-mark">✳</span><span>Y2K<span className="brand-light">CAMERA</span></span>
         </a>
         <div className="top-meta"><span className="live-dot"></span> DIGITAL PHOTO STUDIO <span className="meta-divider">/</span> EST. 2004</div>
-        <div className="top-actions"><button className="top-pill together-pill" onClick={() => setTogetherOpen(!togetherOpen)}>TOGETHER</button><button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button><button className="settings-icon-button" onClick={()=>setSettingsOpen(true)} aria-label="Open settings" title="Settings"><span></span><span></span><span></span></button></div>
+        <div className="top-actions"><button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button><button className="settings-icon-button" onClick={()=>setSettingsOpen(true)} aria-label="Open settings" title="Settings"><span></span><span></span><span></span></button></div>
       </header>
 
       <main>
+        <nav className="main-tabs" aria-label="Main sections"><button className={activeTab==='camera'?'active':''} onClick={()=>setActiveTab('camera')}>📷 <span>CAMERA</span></button><button className={activeTab==='together'?'active':''} onClick={()=>setActiveTab('together')}>♡ <span>TOGETHER</span>{roomStatus==='connected'&&<i className="tab-live-dot"/>}</button></nav>
         <section className="intro"><div><h1>Y2K Camera</h1><p>A little digital camera for keeping the good bits.</p></div><div className="appearance-bar"><label>STYLE<select value={style} onChange={e=>setStyle(e.target.value)}>{STYLES.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>THEME<select value={theme} onChange={e=>setTheme(e.target.value)}>{THEMES.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label></div></section>
 
+        {activeTab === 'camera' && <>
         <div className="studio-grid">
           <section className="camera-column">
             <div className="section-head"><span><i className="tiny-square"></i> LIVE VIEWFINDER</span><span className="mono-label">CAM_01 <b>●</b></span></div>
@@ -628,6 +636,7 @@ function App() {
             </div>
           </aside>
         </div>
+        </>}
                 {settingsOpen && <div className="settings-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSettingsOpen(false);}}><section className="settings-dialog" role="dialog" aria-modal="true" aria-label="Camera settings"><div className="settings-dialog-head"><div><span>CONTROL ROOM</span><h2>Settings</h2><p>Devices, sound and your camera setup.</p></div><button onClick={()=>setSettingsOpen(false)} aria-label="Close settings">×</button></div>
           <div className="settings-dialog-grid"><section className="settings-section"><span className="settings-kicker">CALL DEVICES</span>
             <label className="setting-label">MICROPHONE INPUT</label><select value={audioInput} onChange={e=>changeInput('audio',e.target.value)}><option value="">System default</option>{devices.audioinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Microphone '+(i+1)}</option>)}</select>
@@ -638,8 +647,8 @@ function App() {
             <div className="settings-theme-preview"><span className="theme-preview-chip"></span><div><b>{STYLES.find(s=>s.id===style)?.name}</b><small>{THEMES.find(t=>t.id===theme)?.name} colour theme</small></div></div>
             <button className="settings-reset" onClick={()=>{setTheme('silver');setStyle('y2k');setMicEnabled(true);setVideoEnabled(true);setAudioInput('');setVideoInput('');setAudioOutput('');}}>RESET SETTINGS</button></section></div>
           </section></div>}
-                {togetherOpen && <section className="together-panel">
-          <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><button className="text-button" onClick={() => setTogetherOpen(false)}>CLOSE ×</button></div>
+                {activeTab === 'together' && <section className="together-panel">
+          <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><span className="mono-label">PRIVATE ROOM</span></div>
           <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
           {roomStatus==='idle' || roomStatus==='error' ? <div className="room-entry">
             <div className="room-create"><span className="room-number">01 / HOST</span><h3>Start a private room</h3><p>Generate a 6-character code to share with your person.</p><button className="primary-button" onClick={createRoom}>GENERATE ROOM CODE ↗</button></div>
@@ -649,15 +658,16 @@ function App() {
             {incomingCall && <div className="incoming-invite"><div><b>♡ SOMEONE WANTS TO JOIN</b><span>They are asking to join your private camera room.</span></div><button className="primary-button" onClick={acceptIncomingCall}>ACCEPT ↗</button><button className="secondary-room-button" onClick={rejectIncomingCall}>DECLINE ×</button></div>}
             <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
             <div className="room-feeds">
-              <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline style={{filter:filterAtIntensity(activeFilter.css,intensity)}}/><span>YOU · CAM 01</span></div>
+              <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline style={{filter:filterAtIntensity(togetherActiveFilter.css,togetherIntensity)}}/><span>YOU · CAM 01</span></div>
               <div className="room-feed remote-feed">{remoteReady ? <video ref={remoteVideoRef} autoPlay playsInline style={{filter:filterAtIntensity(remoteActiveFilter.css,remoteFilter.intensity)}}/> : <div className="waiting-feed"><b>♡</b><span>WAITING FOR YOUR PERSON</span><small>Share your 6-character room code</small></div>}<span>YOUR PERSON · CAM 02</span></div>
             </div>
-            {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Pick your filter and timer in the camera studio, then capture both cameras at once.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
+            {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Your Together filter is independent from the solo camera. Choose a look below; it applies to your preview and your saved synced photo.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
+            <section className="together-filter-panel"><div className="together-filter-head"><div><span className="room-kicker">YOUR TOGETHER LOOK</span><h3>{togetherActiveFilter.name}</h3></div><label>STRENGTH <b>{togetherIntensity}%</b><input type="range" min="0" max="100" value={togetherIntensity} onChange={e=>setTogetherIntensity(Number(e.target.value))}/></label></div><label className="filter-category-label">FILTER COLLECTION<select value={togetherGroup} onChange={e=>setTogetherGroup(e.target.value)}>{GROUPS.map(g=><option key={g} value={g}>{g==='ALL'?'All filters':g.charAt(0)+g.slice(1).toLowerCase()}</option>)}</select></label><div className="together-filter-grid">{togetherVisibleFilters.map((filter,index)=><button key={filter.name} className={cx('filter-tile redesigned-filter-tile',togetherSelected===filter.name&&'chosen')} onClick={()=>setTogetherSelected(filter.name)}><span className="filter-index">{String(index+1).padStart(2,'0')}</span><span className="filter-name">{filter.name}</span><span className="filter-group">{filter.group}</span><span className="filter-select-mark">{togetherSelected===filter.name?'SELECTED':'USE FILTER'}</span></button>)}</div></section>
           </div>}
           {roomError && <div className="room-error">{roomError}</div>}{meetingMessage && <div className="room-success" role="status">{meetingMessage}</div>}
           <div className="room-privacy">⌑ SHARE CODE ONLY WITH YOUR PERSON <span>·</span> HOST APPROVAL REQUIRED <span>·</span> VIDEO IS PEER-TO-PEER</div>
         </section>}
-        <section className="results-section">
+        {activeTab === 'camera' && <><section className="results-section">
           <div className="section-head"><span><i className="tiny-square"></i> YOUR CONTACT SHEET</span><span className="mono-label">{shots.length} / 4 FRAMES</span></div>
           <div className="contact-sheet">
             {shots.length === 0 ? <div className="empty-sheet"><span>▧</span><strong>NOTHING DEVELOPED YET</strong><small>YOUR NEXT FAVOURITE PHOTO MIGHT BE ONE CLICK AWAY.</small></div> : <div className="shot-list">{shots.slice(-4).map((shot,i)=><div className="shot-card" key={shot.id}><img src={shot.data} alt={'Photo '+(i+1)}/><div><span>FRAME 0{i+1}</span><b>{shot.filter}</b><button onClick={() => saveImage(shot.data,'y2k-photo-'+(i+1)+'.jpg')}>SAVE ↗</button></div></div>)}</div>}
@@ -665,10 +675,11 @@ function App() {
           </div>
         </section>
 
-        {showGallery && <section className="gallery-section">
+        {showGallery && activeTab === 'camera' && <section className="gallery-section">
           <div className="section-head"><span><i className="tiny-square pink"></i> MY CAMERA ROLL</span><button className="text-button" onClick={() => setShowGallery(false)}>CLOSE ×</button></div>
           {gallery.length===0 ? <p className="gallery-empty">Your roll is empty. Go make a moment.</p> : <div className="gallery-actions"><button onClick={downloadAllPhotos}>DOWNLOAD ALL ({gallery.length})</button><button onClick={clearGallery}>DELETE ALL</button></div><div className="gallery-grid">{gallery.map(item=><div className="gallery-item" key={item.id}><img src={item.data} alt="Saved camera roll photo"/><div><span>{item.filter}</span><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>↓</button><button onClick={()=>deleteGalleryItem(item.id)}>×</button></div></div>)}</div>}
         </section>}
+        </>}
       </main>
 
       <footer><span>Y2K CAMERA © 2004—2026</span><span>MADE FOR THE MEMORIES, NOT THE ALGORITHM <b>✳</b></span><span>NO UPLOADS. JUST YOU.</span></footer>
