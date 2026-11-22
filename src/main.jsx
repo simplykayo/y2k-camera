@@ -559,6 +559,15 @@ function App() {
                 <div className="camera-resolution">AUTO<br/>HD</div>
               </div>
             </div>
+            <div className="meet-controls" aria-label="Microphone and camera controls">
+              <button className={cx('meet-control', micEnabled && 'is-on')} onClick={toggleMic} aria-pressed={micEnabled} title={micEnabled ? 'Turn microphone off' : 'Turn microphone on'}>
+                <span className="meet-control-icon">{micEnabled ? '🎙' : '🔇'}</span><span>{micEnabled ? 'MIC ON' : 'MIC OFF'}</span>
+              </button>
+              <button className={cx('meet-control', videoEnabled && 'is-on')} onClick={toggleVideo} aria-pressed={videoEnabled} title={videoEnabled ? 'Turn camera off' : 'Turn camera on'}>
+                <span className="meet-control-icon">{videoEnabled ? '▣' : '▧'}</span><span>{videoEnabled ? 'CAMERA ON' : 'CAMERA OFF'}</span>
+              </button>
+              <span className="meet-controls-note">CALL CONTROLS</span>
+            </div>
             {cameraError && <div className="camera-error"><span>!</span>{cameraError}<button onClick={() => startCamera(facing)}>TRY AGAIN ↗</button></div>}
             <div className="shoot-controls">
               <div className="control-block">
@@ -588,7 +597,7 @@ function App() {
           </aside>
         </div>
                 {settingsOpen && <div className="settings-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSettingsOpen(false);}}><section className="settings-dialog" role="dialog" aria-modal="true" aria-label="Camera settings"><div className="settings-dialog-head"><div><span>CONTROL ROOM</span><h2>Settings</h2><p>Devices, sound and your camera setup.</p></div><button onClick={()=>setSettingsOpen(false)} aria-label="Close settings">×</button></div>
-          <div className="settings-dialog-grid"><section className="settings-section"><span className="settings-kicker">CALL DEVICES</span><div className="device-actions"><button className={cx('device-toggle',micEnabled&&'enabled')} onClick={toggleMic}>{micEnabled?'Microphone on':'Microphone off'}</button><button className={cx('device-toggle',videoEnabled&&'enabled')} onClick={toggleVideo}>{videoEnabled?'Camera on':'Camera off'}</button></div>
+          <div className="settings-dialog-grid"><section className="settings-section"><span className="settings-kicker">CALL DEVICES</span>
             <label className="setting-label">MICROPHONE INPUT</label><select value={audioInput} onChange={e=>changeInput('audio',e.target.value)}><option value="">System default</option>{devices.audioinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Microphone '+(i+1)}</option>)}</select>
             <label className="setting-label">CAMERA INPUT</label><select value={videoInput} onChange={e=>changeInput('video',e.target.value)}><option value="">Current camera</option>{devices.videoinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Camera '+(i+1)}</option>)}</select>
             <label className="setting-label">AUDIO OUTPUT</label><select value={audioOutput} onChange={e=>changeOutput(e.target.value)}><option value="">System default</option>{devices.audiooutput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Speaker '+(i+1)}</option>)}</select>
