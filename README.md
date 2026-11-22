@@ -47,3 +47,13 @@ Camera frames are processed in the browser. There is no upload endpoint, account
 ## Notes
 
 The filter presets are implemented with native CSS/canvas color operations, without a paid API or image-processing service. Some effects are color treatments rather than geometric lens distortions.
+
+
+## Together Mode
+
+Together Mode adds private, invite-link video rooms using PeerJS/WebRTC. One person creates a room and shares its unlisted invite link; the other joins from the link. Both people can see each other's live camera and microphone stream, and the Camera Together tab sends a synchronized shutter signal so both browsers capture locally using their own selected filter and timer.
+
+- Video/audio is sent peer-to-peer using WebRTC; photos remain in each browser's session-only camera roll.
+- The invite URL is a bearer link: anyone who receives it can attempt to join, so share it privately and create a fresh room for each session.
+- PeerJS's public signalling service is used to establish connections. Some restrictive networks may require a TURN relay for reliable connectivity.
+- Together Mode requires HTTPS and camera/microphone permission on both devices.
