@@ -98,6 +98,7 @@ function App() {
   const [syncedCaptureLabel, setSyncedCaptureLabel] = useState('');
   const syncBusyRef = useRef(false);
   const syncSessionsRef = useRef(new Set());
+  const syncChunksRef = useRef(new Map());
   const [togetherSelected, setTogetherSelected] = useState('2004 Digicam');
   const [togetherIntensity, setTogetherIntensity] = useState(100);
   const [togetherGroup, setTogetherGroup] = useState('ALL');
@@ -251,7 +252,7 @@ function App() {
   const renderVideoFrame = (video, filterName, filterStrength, mirror = false) => {
     if (!video || !video.videoWidth || !video.videoHeight) return null;
     const canvas = document.createElement('canvas');
-    const scale = Math.min(1, 960 / video.videoWidth);
+    const scale = Math.min(1, 640 / video.videoWidth);
     const width = Math.max(1, Math.round(video.videoWidth * scale));
     const height = Math.max(1, Math.round(video.videoHeight * scale));
     canvas.width = width; canvas.height = height;
@@ -270,7 +271,7 @@ function App() {
       ctx.fillRect(0, 0, width, height);
       ctx.restore();
     }
-    return canvas.toDataURL('image/jpeg', .78);
+    return canvas.toDataURL('image/jpeg', .64);
   };
   const renderFrame = (filterName = selected, filterStrength = intensity) =>
     renderVideoFrame(videoRef.current, filterName, filterStrength, facing === 'user');
@@ -344,12 +345,26 @@ function App() {
         runSyncedCapture(message.sessionId, message.count);
         return;
       }
-      if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_PHOTO') {
-        setSyncedRemotePhotos(old => {
-          const next = [...old];
-          next[message.index] = { data: message.data, filter: message.filter || 'Original' };
-          return next;
-        });
+      if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_PHOTO_CHUNK') {
+        const key = message.sessionId + ':' + message.index;
+        let packet = syncChunksRef.current.get(key);
+        if (!packet) {
+          packet = { parts: new Array(message.total), received: 0, filter: message.filter || 'Original' };
+          syncChunksRef.current.set(key, packet);
+        }
+        if (packet.parts[message.part] == null) {
+          packet.parts[message.part] = message.data;
+          packet.received++;
+        }
+        if (packet.received === message.total) {
+          const data = packet.parts.join('');
+          syncChunksRef.current.delete(key);
+          setSyncedRemotePhotos(old => {
+            const next = [...old];
+            next[message.index] = { data, filter: packet.filter };
+            return next;
+          });
+        }
         return;
       }
       if (message && typeof message === 'object' && message.type === 'Y2K_FILTER') {
@@ -478,8 +493,16 @@ function App() {
         next[index] = localPhoto;
         return next;
       });
+      const chunkSize = 12000;
+      const totalChunks = Math.ceil(data.length / chunkSize);
       dataConnectionsRef.current.forEach(connection => {
-        if (connection.open) connection.send({ type: 'Y2K_SYNC_PHOTO', sessionId, index, data, filter: togetherSelected });
+        if (!connection.open) return;
+        for (let part = 0; part < totalChunks; part++) {
+          connection.send({
+            type: 'Y2K_SYNC_PHOTO_CHUNK', sessionId, index, part, total: totalChunks,
+            filter: togetherSelected, data: data.slice(part * chunkSize, (part + 1) * chunkSize)
+          });
+        }
       });
       setFlash(false);
     }
