@@ -503,3 +503,17 @@ footer b{color:#245b91;margin-left:5px}
 .app-shell .synced-strip-row>div{display:flex;flex-direction:column;align-items:stretch;gap:4px;height:auto;aspect-ratio:auto;padding:4px;background:var(--surface,#fff)}
 .app-shell .synced-strip-row>div img{width:100%;aspect-ratio:3/4;height:auto;object-fit:cover}
 .app-shell .synced-strip-save{padding:6px 2px;border:1px solid var(--line,#d8d4cc);border-radius:4px;background:var(--surface,#fff);color:var(--ink,#333);font:700 8px "Courier New",monospace;cursor:pointer}
+
+
+/* Together room timer, invite preferences and expiring code */
+.app-shell .together-timer-control{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:14px 0;padding:12px 14px;background:var(--panel,#f4f2ed);border:1px solid var(--line,#d8d4cc);border-radius:10px}
+.app-shell .together-timer-control>span{font:700 9px "Courier New",monospace;letter-spacing:1px;color:var(--muted,#777)}
+.app-shell .together-timer-control>.segmented{display:flex;gap:3px;padding:3px;background:var(--surface,#fff);border:1px solid var(--line,#d8d4cc);border-radius:7px}
+.app-shell .together-timer-control>.segmented button{min-width:39px;padding:7px 9px;border:0;border-radius:5px;background:transparent;color:var(--muted,#777);font:700 10px "Courier New",monospace;cursor:pointer}
+.app-shell .together-timer-control>.segmented button.selected{background:var(--accent-soft,#e8e5df);color:var(--ink,#222)}
+.app-shell .together-timer-control>label{display:flex;align-items:center;gap:7px;color:var(--muted,#666);font:700 9px "Courier New",monospace;letter-spacing:.5px;cursor:pointer}
+.app-shell .together-timer-control>label input{accent-color:var(--accent,#777)}
+.app-shell .room-expiry-note{display:block;margin-top:7px;color:var(--muted,#777);font:700 9px "Courier New",monospace;letter-spacing:1px}
+.app-shell[data-style="meet"] .together-timer-control{background:#fff;border:1px solid #e3e6e8;border-radius:12px}
+.app-shell[data-style="meet"] .together-timer-control>span,.app-shell[data-style="meet"] .together-timer-control>label{font-family:Arial,sans-serif}
+@media(max-width:560px){.app-shell .together-timer-control{justify-content:flex-start;gap:10px}.app-shell .together-timer-control>label{width:100%;padding-top:5px}}
