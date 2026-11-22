@@ -428,3 +428,13 @@ footer b{color:#245b91;margin-left:5px}
 .app-shell[data-style="meet"] .main-tabs{background:#f1f3f4;border:0;border-radius:24px}.app-shell[data-style="meet"] .main-tabs button{font:600 12px Arial,sans-serif;letter-spacing:0;color:#5f6368;border-radius:20px}.app-shell[data-style="meet"] .main-tabs button.active{background:#fff;color:#1a73e8;box-shadow:0 1px 4px #00000018}
 .app-shell[data-style="meet"] .together-filter-panel{background:#fff;border:1px solid #e3e6e8;border-radius:12px}.app-shell[data-style="meet"] .together-filter-head h3{font:500 21px Arial,sans-serif}.app-shell[data-style="meet"] .together-filter-grid .redesigned-filter-tile{background:#fff;border:1px solid #e3e6e8;border-radius:9px}.app-shell[data-style="meet"] .together-filter-grid .redesigned-filter-tile.chosen{background:#e8f0fe;border-color:#8ab4f8}
 @media(max-width:560px){.main-tabs{width:100%}.main-tabs button{flex:1;justify-content:center;padding:10px}.together-filter-head{align-items:flex-start;flex-direction:column}.together-filter-head label{width:100%}.together-filter-panel>.filter-category-label{align-items:flex-start;flex-direction:column}.together-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Header-level app navigation: tabs switch entire views, not page sections */
+.app-shell .topbar .main-tabs{display:flex;align-items:center;gap:4px;width:auto;margin:0 10px 0 auto;padding:3px;background:var(--theme-panel,#ececec);border:1px solid var(--theme-line,#d6d6d6);border-radius:9px;flex:0 0 auto}
+.app-shell .topbar .main-tabs button{padding:9px 14px;white-space:nowrap;border-radius:6px;font:700 9px "Courier New",monospace;letter-spacing:1px}
+.app-shell .topbar .main-tabs button.active{background:var(--theme-card,#fff);color:var(--theme-accent,#315f8b);box-shadow:0 1px 4px #00000014}
+.app-shell[data-style="meet"] .topbar .main-tabs{background:#f1f3f4;border:0;border-radius:24px}
+.app-shell[data-style="meet"] .topbar .main-tabs button{font:600 12px Arial,sans-serif;letter-spacing:0;border-radius:20px}
+.app-shell[data-style="meet"] .topbar .main-tabs button.active{background:#fff;color:#1a73e8}
+.app-shell .together-panel{margin-top:18px}
+@media(max-width:700px){.app-shell .topbar{flex-wrap:wrap;gap:10px}.app-shell .topbar .main-tabs{order:3;width:100%;margin:0;justify-content:center}.app-shell .topbar .main-tabs button{flex:1;justify-content:center}.app-shell .top-actions{margin-left:auto}}
