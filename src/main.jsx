@@ -403,6 +403,20 @@ function App() {
     if (connection.open) { setDataReady(true); sendCurrentFilter(); }
     connection.on('open', () => { setDataReady(true); sendCurrentFilter(); });
     connection.on('data', message => {
+      if (message && typeof message === 'object' && message.type === 'Y2K_HOST_HANDOFF') {
+        const expiry = Number(message.expiresAt);
+        if (Number.isFinite(expiry) && expiry > Date.now()) {
+          callRef.current?.close(); callRef.current = null;
+          peerRef.current?.destroy(); peerRef.current = null;
+          dataConnectionsRef.current = []; pendingConnectionsRef.current = [];
+          approvedPeerRef.current = ''; incomingCallRef.current = null;
+          isRoomHostRef.current = true;
+          setIncomingCall(null); setRemoteReady(false); setRemoteStream(null); setDataReady(false);
+          setRoomStatus('starting');
+          createRoom({ expiresAt: expiry });
+        }
+        return;
+      }
       if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_SHUTTER') {
         if (typeof message.sessionId === 'string' && message.sessionId.length <= 64 && [1, 4].includes(Number(message.count))) { const delay = [0, 3, 5, 10].includes(Number(message.countdown)) ? Number(message.countdown) : 3; runSyncedCapture(message.sessionId, message.count, delay); }
         return;
@@ -646,8 +660,18 @@ function App() {
     takePhoto();
   };
 
-  const leaveRoom = () => {
-    if (roomStatus !== 'idle' && !window.confirm('Leave this camera room? Your current photos will stay in your camera roll.')) return;
+  const handoffAndLeave = () => {
+    if (roomStatus !== 'connected') { leaveRoom(); return; }
+    const expiry = roomExpiresAt || (Date.now() + 10 * 60 * 1000);
+    dataConnectionsRef.current.forEach(connection => {
+      if (connection.open) connection.send({ type: 'Y2K_HOST_HANDOFF', expiresAt: expiry });
+    });
+    setMeetingMessage('Passing the room to the other person…');
+    window.setTimeout(() => leaveRoom(true), 500);
+  };
+
+  const leaveRoom = (skipConfirm = false) => {
+    if (!skipConfirm && roomStatus !== 'idle' && !window.confirm('Leave this camera room? Your current photos will stay in your camera roll.')) return;
     callRef.current?.close();
     peerRef.current?.destroy();
     peerRef.current = null;
@@ -884,6 +908,7 @@ function App() {
             <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Enter the 6-digit code they sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value.replace(/\D/g, '').slice(0,6))} placeholder="e.g. 482915" maxLength={6} inputMode="numeric" autoComplete="off" /><button className="secondary-room-button" onClick={joinRoom}>JOIN ROOM ↗</button></div>
           </div> : <div className="room-active">
             {roomCode && <div className="invite-box"><div><span className="room-number">YOUR ROOM CODE</span><code className="room-code-display">{roomCode}</code><small className="room-expiry-note">EXPIRES IN {Math.floor(roomSecondsLeft/60)}:{String(roomSecondsLeft%60).padStart(2,'0')}</small></div><button className="primary-button" onClick={copyRoomCode}>COPY CODE ↗</button><button className="secondary-room-button" onClick={copyInvite}>COPY INVITE MESSAGE</button><button className="secondary-room-button" onClick={()=>{if(window.confirm('Create a new code? Anyone using the current code will be disconnected.')){callRef.current?.close();peerRef.current?.destroy();peerRef.current=null;callRef.current=null;dataConnectionsRef.current=[];pendingConnectionsRef.current.forEach(c=>c.close());pendingConnectionsRef.current=[];approvedPeerRef.current='';incomingCallRef.current=null;setIncomingCall(null);setRemoteReady(false);setRemoteStream(null);setDataReady(false);setRoomCode('');setRoomExpiresAt(null);try{localStorage.removeItem(ROOM_STORAGE_KEY);}catch{}setRoomStatus('idle');createRoom();}}}>NEW CODE ↻</button></div>}
+            {roomStatus === 'connected' && <button className="secondary-room-button room-handoff-button" onClick={handoffAndLeave}>HAND OFF HOST & LEAVE ↗</button>}
             {incomingCall && <div className="incoming-invite"><div><b>♡ SOMEONE WANTS TO JOIN</b><span>They are asking to join your private camera room.</span></div><button className="primary-button" onClick={acceptIncomingCall}>ACCEPT ↗</button><button className="secondary-room-button" onClick={rejectIncomingCall}>DECLINE ×</button></div>}
             <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
             <div className="together-timer-control"><span>SYNC TIMER</span><div className="segmented">{[0,3,5,10].map(n=><button key={'together-timer-'+n} className={countdown===n?'selected':''} onClick={()=>setCountdown(n)}>{n===0?'OFF':n+'s'}</button>)}</div><label><input type="checkbox" checked={autoAcceptInvites} onChange={e=>{setAutoAcceptInvites(e.target.checked);try{localStorage.setItem('y2k-auto-accept-invites',String(e.target.checked));}catch{}}}/> AUTO-ACCEPT INVITES</label></div>
@@ -892,7 +917,7 @@ function App() {
               <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline style={{filter:filterAtIntensity(togetherActiveFilter.css,togetherIntensity)}}/><span>YOU · CAM 01</span></div>
               <div className="room-feed remote-feed">{remoteReady ? <video ref={remoteVideoRef} autoPlay playsInline style={{filter:filterAtIntensity(remoteActiveFilter.css,remoteFilter.intensity)}}/> : <div className="waiting-feed"><b>♡</b><span>WAITING FOR YOUR PERSON</span><small>Share your 6-character room code</small></div>}<span>YOUR PERSON · CAM 02</span></div>
             </div>
-            {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Your Together filter is independent from the solo camera. Choose a look below; it applies to your preview and your saved synced photo.</p><div className="synced-mode-picker" role="group" aria-label="Synchronized capture mode"><button type="button" className={mode==='single'?'active':''} onClick={()=>setMode('single')} aria-pressed={mode==='single'}>ONE PHOTO</button><button type="button" className={mode==='strip'?'active':''} onClick={()=>setMode('strip')} aria-pressed={mode==='strip'}>4-PHOTO STRIP</button></div><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || syncRunning}>◎ {syncRunning?'CAPTURING BOTH CAMERAS…':'SYNC SHUTTER — BOTH CAMERAS'}</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
+            {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={handoffAndLeave}>LEAVE & HAND OFF HOST ↗</button></div> : <div className="room-camera-controls"><p>Your Together filter is independent from the solo camera. Choose a look below; it applies to your preview and your saved synced photo.</p><div className="synced-mode-picker" role="group" aria-label="Synchronized capture mode"><button type="button" className={mode==='single'?'active':''} onClick={()=>setMode('single')} aria-pressed={mode==='single'}>ONE PHOTO</button><button type="button" className={mode==='strip'?'active':''} onClick={()=>setMode('strip')} aria-pressed={mode==='strip'}>4-PHOTO STRIP</button></div><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || syncRunning}>◎ {syncRunning?'CAPTURING BOTH CAMERAS…':'SYNC SHUTTER — BOTH CAMERAS'}</button><button className="secondary-room-button" onClick={handoffAndLeave}>LEAVE & HAND OFF HOST ↗</button></div>}
 
           </div>}
           <section className="together-filter-panel"><div className="together-filter-head"><div><span className="room-kicker">YOUR TOGETHER LOOK</span><h3>{togetherActiveFilter.name}</h3></div><label>STRENGTH <b>{togetherIntensity}%</b><input type="range" min="0" max="100" value={togetherIntensity} onChange={e=>setTogetherIntensity(Number(e.target.value))}/></label></div><label className="filter-category-label">FILTER COLLECTION<select value={togetherGroup} onChange={e=>setTogetherGroup(e.target.value)}>{GROUPS.map(g=><option key={g} value={g}>{g==='ALL'?'All filters':g.charAt(0)+g.slice(1).toLowerCase()}</option>)}</select></label><div className="together-filter-grid">{togetherVisibleFilters.map((filter,index)=><button key={filter.name} className={cx('filter-tile redesigned-filter-tile',togetherSelected===filter.name&&'chosen')} onClick={()=>setTogetherSelected(filter.name)}><span className="filter-index">{String(index+1).padStart(2,'0')}</span><span className="filter-name">{filter.name}</span><span className="filter-group">{filter.group}</span><span className="filter-select-mark">{togetherSelected===filter.name?'SELECTED':'USE FILTER'}</span></button>)}</div></section>
