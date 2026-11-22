@@ -346,6 +346,14 @@ function App() {
     takePhoto();
   };
 
+  const handleMainShutter = () => {
+    if (roomStatus === 'connected' && roomMode === 'camera') {
+      if (remoteReady && dataReady) syncShutter();
+      return;
+    }
+    takePhoto();
+  };
+
   const leaveRoom = () => {
     callRef.current?.close();
     peerRef.current?.destroy();
@@ -478,7 +486,7 @@ function App() {
                 <div className="camera-status"><span className={cx('status-dot', cameraReady && 'ready')}></span>{cameraReady ? 'CAMERA READY' : 'WAITING FOR CAMERA'}</div>
                 <div className="camera-controls">
                   <button className="round-control" title="Switch camera" onClick={switchCamera}>↔</button>
-                  <button className="shutter" onClick={takePhoto} disabled={!cameraReady || busy} aria-label="Take photo"><span></span></button>
+                  <button className="shutter" onClick={handleMainShutter} disabled={!cameraReady || busy || (roomStatus === 'connected' && roomMode === 'camera' && (!remoteReady || !dataReady))} aria-label={roomStatus === 'connected' && roomMode === 'camera' ? 'Take photo on both cameras' : 'Take photo'}><span></span></button>
                   <button className={cx('round-control', sound && 'active')} title="Toggle shutter sound" onClick={() => setSound(!sound)}>♫</button>
                 </div>
                 <div className="camera-resolution">AUTO<br/>HD</div>
