@@ -265,7 +265,7 @@ function App() {
       setRoomError('');
       setRoomStatus('starting');
       const stream = await prepareRoomCamera();
-      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
       const code = Array.from(crypto.getRandomValues(new Uint8Array(6)), byte => alphabet[byte % alphabet.length]).join('');
       const peer = new Peer(code);
       peerRef.current = peer;
@@ -288,8 +288,8 @@ function App() {
   };
 
   const joinRoom = async () => {
-    const targetId = joinInput.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (!/^[A-HJ-NP-Z2-9]{6}$/.test(targetId)) { setRoomError('Enter the 6-character room code.'); return; }
+    const targetId = joinInput.trim().toUpperCase().replace(/[^A-Z]/g, '');
+    if (!/^[A-HJ-NP-Z]{6}$/.test(targetId)) { setRoomError('Enter the 6-character room code.'); return; }
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
     try {
       setRoomError('');
@@ -511,7 +511,7 @@ function App() {
             <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Enter the 6-character code they sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0,6))} placeholder="e.g. K7M2QX" maxLength={6} autoComplete="off" /><button className="secondary-room-button" onClick={joinRoom}>JOIN ROOM ↗</button></div>
           </div> : <div className="room-active">
             {roomCode && <div className="invite-box"><div><span className="room-number">YOUR ROOM CODE</span><code className="room-code-display">{roomCode}</code></div><button className="primary-button" onClick={copyRoomCode}>COPY CODE ↗</button></div>}
-            {incomingCall && <div className="incoming-invite"><div><b>♡ SOMEONE HAS YOUR INVITE</b><span>They are asking to join your private camera room.</span></div><button className="primary-button" onClick={acceptIncomingCall}>ACCEPT ↗</button><button className="secondary-room-button" onClick={rejectIncomingCall}>DECLINE ×</button></div>}
+            {incomingCall && <div className="incoming-invite"><div><b>♡ SOMEONE WANTS TO JOIN</b><span>They are asking to join your private camera room.</span></div><button className="primary-button" onClick={acceptIncomingCall}>ACCEPT ↗</button><button className="secondary-room-button" onClick={rejectIncomingCall}>DECLINE ×</button></div>}
             <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
             <div className="room-feeds">
               <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline style={{filter:filterAtIntensity(activeFilter.css,intensity)}}/><span>YOU · CAM 01</span></div>
