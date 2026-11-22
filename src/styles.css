@@ -174,3 +174,43 @@ footer b{color:#245b91;margin-left:5px}
   footer{flex-direction:column;gap:7px;margin-top:35px}
   .section-head{font-size:8px}
 }
+
+.top-actions{display:flex;align-items:center;gap:9px}
+.together-pill{background:#d9dce0;color:#214f7b;border-color:#8397a7}
+.together-panel{margin-top:30px;padding:16px;border:1px solid #929da0;background:linear-gradient(145deg,#edf0ee,#cbd2d2);box-shadow:inset 1px 1px #fff,3px 4px 0 #b5bcba}
+.together-intro{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;padding:8px 2px 18px}
+.room-kicker,.room-number{font:8px "Courier New",monospace;letter-spacing:1px;color:#245b91}
+.together-intro h2{font-size:clamp(22px,3vw,34px);letter-spacing:-1.3px;text-transform:uppercase;margin:7px 0}
+.together-intro p,.room-create p,.room-join p,.room-camera-controls p{font:10px/1.6 "Courier New",monospace;color:#68747a;margin:0}
+.room-status{font:8px "Courier New",monospace;letter-spacing:.6px;white-space:nowrap;color:#53646b}
+.room-status i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#a5adb0;margin-right:7px}
+.room-status i.connected{background:#7d9f55}
+.room-entry{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.room-create,.room-join{padding:17px;background:#e3e7e4;border:1px solid #aab3b2;box-shadow:inset 1px 1px #fff}
+.room-create h3,.room-join h3{font-size:16px;margin:8px 0 5px;text-transform:uppercase}
+.room-create .primary-button,.room-join .secondary-room-button{margin-top:14px}
+.room-join input{display:block;width:100%;margin-top:12px;padding:11px;border:1px solid #aab4b5;background:#f7f8f5;color:#27343b;font:10px "Courier New",monospace;outline-color:#245b91}
+.secondary-room-button{border:1px solid #8c999d;background:#dfe4e1;color:#244f7c;padding:10px 13px;font:8px "Courier New",monospace;letter-spacing:.6px;cursor:pointer;box-shadow:inset 1px 1px #fff,2px 2px 0 #b2bab8}
+.invite-box{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px;background:#e8ece8;border:1px solid #aab4b2;margin-bottom:13px}
+.invite-box code{display:block;margin-top:6px;max-width:100%;overflow-wrap:anywhere;color:#314d61;font:9px "Courier New",monospace}
+.room-view-tabs{display:flex;gap:5px;margin-bottom:10px}
+.room-view-tabs button{border:1px solid #aab4b2;background:#e5e9e6;padding:8px 12px;color:#627078;font:8px "Courier New",monospace;cursor:pointer}
+.room-view-tabs button.active{background:#245b91;color:#fff;border-color:#173e67}
+.room-feeds{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.room-feed{position:relative;min-width:0;aspect-ratio:4/3;background:#14232b;border:5px solid #263740;box-shadow:inset 0 0 0 1px #83949a;overflow:hidden}
+.room-feed video{width:100%;height:100%;display:block;object-fit:cover}
+.room-feed:first-child video{transform:scaleX(-1)}
+.room-feed>span{position:absolute;left:9px;top:9px;background:#12232dcc;color:#e2eee6;padding:5px 7px;font:8px "Courier New",monospace;letter-spacing:.6px}
+.waiting-feed{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#dce8e1;background:repeating-linear-gradient(0deg,#182a32,#182a32 2px,#1e3038 3px)}
+.waiting-feed b{font-size:36px;color:#c6df6d}
+.waiting-feed span{font:9px "Courier New",monospace;letter-spacing:.8px}
+.waiting-feed small{font:8px "Courier New",monospace;color:#9eafa7}
+.room-call-controls,.room-camera-controls{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px}
+.room-call-controls>span{font:9px "Courier New",monospace;color:#65747a}
+.room-camera-controls{flex-wrap:wrap}
+.room-camera-controls p{flex:1 1 100%}
+.sync-shutter{font-size:9px;padding:13px 18px}
+.room-error{margin-top:12px;padding:10px;border:1px solid #b28f88;background:#f3e7e2;color:#794a43;font:10px/1.5 "Courier New",monospace}
+.room-privacy{margin-top:15px;padding-top:11px;border-top:1px solid #b5bfbd;text-align:center;color:#718087;font:7px "Courier New",monospace;letter-spacing:.7px}
+.room-privacy span{padding:0 7px;color:#9aa5a4}
+@media(max-width:650px){.top-actions{gap:5px}.top-pill{padding:8px 8px;font-size:8px}.together-panel{padding:10px}.together-intro{align-items:flex-start;flex-direction:column}.room-entry{grid-template-columns:1fr}.room-feeds{gap:6px}.room-feed{border-width:3px}.room-feed>span{font-size:6px;left:4px;top:4px;padding:4px}.waiting-feed span{font-size:7px}.waiting-feed small{font-size:6px}.invite-box{align-items:flex-start;flex-direction:column}.room-call-controls{align-items:flex-start;flex-direction:column}.room-privacy{line-height:1.8}}
