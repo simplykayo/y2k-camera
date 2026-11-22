@@ -96,6 +96,7 @@ function App() {
   const [dataReady, setDataReady] = useState(false);
   const [roomError, setRoomError] = useState('');
   const [roomMode, setRoomMode] = useState('call');
+  const [incomingCall, setIncomingCall] = useState(null);
 
   const activeFilter = useMemo(() => FILTERS.find(f => f.name === selected) || FILTERS[0], [selected]);
   const visibleFilters = useMemo(() => group === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === group), [group]);
@@ -274,8 +275,7 @@ function App() {
         setRoomStatus('waiting');
       });
       peer.on('call', call => {
-        call.answer(stream);
-        attachRemoteCall(call);
+        setIncomingCall(call);
       });
       peer.on('connection', setupDataConnection);
       peer.on('error', error => {
@@ -318,6 +318,18 @@ function App() {
       setRoomError(error.name === 'NotAllowedError' ? 'Allow camera and microphone access to join the room.' : (error.message || 'Could not join the room.'));
       setRoomStatus('error');
     }
+  };
+
+  const acceptIncomingCall = () => {
+    if (!incomingCall || !streamRef.current) return;
+    incomingCall.answer(streamRef.current);
+    attachRemoteCall(incomingCall);
+    setIncomingCall(null);
+  };
+
+  const rejectIncomingCall = () => {
+    incomingCall?.close();
+    setIncomingCall(null);
   };
 
   const syncShutter = () => {
@@ -505,6 +517,7 @@ function App() {
             <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Paste the room link your person sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value)} placeholder="Paste private room invite link…" /><button className="secondary-room-button" onClick={joinRoom}>JOIN THEIR ROOM ↗</button></div>
           </div> : <div className="room-active">
             {roomLink && <div className="invite-box"><div><span className="room-number">YOUR PRIVATE INVITE LINK</span><code>{roomLink}</code></div><button className="primary-button" onClick={copyRoomLink}>COPY LINK ↗</button></div>}
+            {incomingCall && <div className="incoming-invite"><div><b>♡ SOMEONE HAS YOUR INVITE</b><span>They are asking to join your private camera room.</span></div><button className="primary-button" onClick={acceptIncomingCall}>ACCEPT ↗</button><button className="secondary-room-button" onClick={rejectIncomingCall}>DECLINE ×</button></div>}
             <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
             <div className="room-feeds">
               <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline/><span>YOU · CAM 01</span></div>
@@ -513,7 +526,7 @@ function App() {
             {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Pick your filter and timer in the camera studio, then capture both cameras at once.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
           </div>}
           {roomError && <div className="room-error">{roomError}</div>}
-          <div className="room-privacy">⌑ INVITE-LINK ACCESS ONLY <span>·</span> VIDEO IS PEER-TO-PEER <span>·</span> NO PHOTO UPLOADS</div>
+          <div className="room-privacy">⌑ PRIVATE INVITE LINK <span>·</span> HOST APPROVAL REQUIRED <span>·</span> VIDEO IS PEER-TO-PEER</div>
         </section>}
         <section className="results-section">
           <div className="section-head"><span><i className="tiny-square"></i> YOUR CONTACT SHEET</span><span className="mono-label">{shots.length} / 4 FRAMES</span></div>
