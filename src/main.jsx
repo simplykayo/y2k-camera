@@ -401,11 +401,11 @@ function App() {
         return;
       }
       if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_PHOTO_CHUNK') {
-        if (typeof message.sessionId !== 'string' || message.sessionId.length > 64 || !Number.isInteger(message.index) || message.index < 0 || message.index > 3 || !Number.isInteger(message.total) || message.total < 1 || message.total > 128 || !Number.isInteger(message.part) || message.part < 0 || message.part >= message.total || typeof message.data !== 'string' || message.data.length > 16000) return;
+        if (typeof message.sessionId !== 'string' || message.sessionId.length > 64 || !Number.isInteger(message.index) || message.index < 0 || message.index > 3 || !Number.isInteger(message.total) || message.total < 1 || message.total > 64 || !Number.isInteger(message.part) || message.part < 0 || message.part >= message.total || typeof message.data !== 'string' || message.data.length > 16000) return;
         const key = message.sessionId + ':' + message.index;
         let packet = syncChunksRef.current.get(key);
         if (!packet) {
-          if (syncChunksRef.current.size >= 16) return;
+          if (syncChunksRef.current.size >= 8) return;
           packet = { parts: new Array(message.total), received: 0, filter: FILTERS.some(filter => filter.name === message.filter) ? message.filter : 'Original' };
           syncChunksRef.current.set(key, packet);
         }
