@@ -93,6 +93,11 @@ function App() {
   const approvedPeerRef = useRef('');
   const isRoomHostRef = useRef(false);
   const [activeTab, setActiveTab] = useState('camera');
+  const [syncedLocalPhotos, setSyncedLocalPhotos] = useState([]);
+  const [syncedRemotePhotos, setSyncedRemotePhotos] = useState([]);
+  const [syncedCaptureLabel, setSyncedCaptureLabel] = useState('');
+  const syncBusyRef = useRef(false);
+  const syncSessionsRef = useRef(new Set());
   const [togetherSelected, setTogetherSelected] = useState('2004 Digicam');
   const [togetherIntensity, setTogetherIntensity] = useState(100);
   const [togetherGroup, setTogetherGroup] = useState('ALL');
@@ -243,30 +248,32 @@ function App() {
     } catch {}
   };
 
-  const renderFrame = (filterName = selected, filterStrength = intensity) => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !video.videoWidth) return null;
-    const width = video.videoWidth;
-    const height = video.videoHeight;
+  const renderVideoFrame = (video, filterName, filterStrength, mirror = false) => {
+    if (!video || !video.videoWidth || !video.videoHeight) return null;
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(1, 960 / video.videoWidth);
+    const width = Math.max(1, Math.round(video.videoWidth * scale));
+    const height = Math.max(1, Math.round(video.videoHeight * scale));
     canvas.width = width; canvas.height = height;
     const ctx = canvas.getContext('2d');
-    ctx.save();
-    if (facing === 'user') { ctx.translate(width, 0); ctx.scale(-1, 1); }
     const captureFilter = FILTERS.find(f => f.name === filterName) || FILTERS[0];
+    ctx.save();
+    if (mirror) { ctx.translate(width, 0); ctx.scale(-1, 1); }
     ctx.filter = filterAtIntensity(captureFilter.css, filterStrength) + ' brightness(' + (1 + exposure/100) + ')';
     ctx.drawImage(video, 0, 0, width, height);
     ctx.restore();
     if (captureFilter.tint && captureFilter.alpha) {
       ctx.save();
-      ctx.globalCompositeOperation = activeFilter.blend || 'soft-light';
+      ctx.globalCompositeOperation = captureFilter.blend || 'soft-light';
       ctx.globalAlpha = captureFilter.alpha * (filterStrength / 100);
       ctx.fillStyle = captureFilter.tint;
       ctx.fillRect(0, 0, width, height);
       ctx.restore();
     }
-    return canvas.toDataURL('image/jpeg', .94);
+    return canvas.toDataURL('image/jpeg', .78);
   };
+  const renderFrame = (filterName = selected, filterStrength = intensity) =>
+    renderVideoFrame(videoRef.current, filterName, filterStrength, facing === 'user');
 
   const takeOne = async (filterName = selected, filterStrength = intensity) => {
     const data = renderFrame(filterName, filterStrength);
@@ -333,7 +340,18 @@ function App() {
     if (connection.open) { setDataReady(true); sendCurrentFilter(); }
     connection.on('open', () => { setDataReady(true); sendCurrentFilter(); });
     connection.on('data', message => {
-      if (message === 'Y2K_SYNC_SHUTTER') { takePhoto(togetherSelected, togetherIntensity); return; }
+      if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_SHUTTER') {
+        runSyncedCapture(message.sessionId, message.count);
+        return;
+      }
+      if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_PHOTO') {
+        setSyncedRemotePhotos(old => {
+          const next = [...old];
+          next[message.index] = { data: message.data, filter: message.filter || 'Original' };
+          return next;
+        });
+        return;
+      }
       if (message && typeof message === 'object' && message.type === 'Y2K_FILTER') {
         const valid = FILTERS.some(filter => filter.name === message.name);
         if (valid) setRemoteFilter({ name: message.name, intensity: Math.max(0, Math.min(100, Number(message.intensity) || 0)) });
@@ -430,11 +448,56 @@ function App() {
     setIncomingCall(null);
   };
 
+  const runSyncedCapture = async (sessionId, requestedCount = 1) => {
+    if (!sessionId || syncSessionsRef.current.has(sessionId)) return;
+    syncSessionsRef.current.add(sessionId);
+    const total = Math.max(1, Math.min(4, Number(requestedCount) || 1));
+    setSyncedLocalPhotos([]);
+    setSyncedRemotePhotos([]);
+    setSyncedCaptureLabel(total === 4 ? 'FOUR-POSE CONNECTED PHOTO STRIP' : 'SYNCHRONIZED PHOTO PAIR');
+    for (let index = 0; index < total; index++) {
+      if (index > 0) await new Promise(resolve => setTimeout(resolve, 650));
+      setTimer(countdown);
+      for (let n = countdown; n > 0; n--) {
+        setTimer(n);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      setTimer(0);
+      const localVideo = localRoomVideoRef.current || videoRef.current;
+      const data = renderVideoFrame(localVideo, togetherSelected, togetherIntensity, facing === 'user');
+      if (!data) {
+        setRoomError('Camera frame was not ready. Keep both camera previews open and try again.');
+        syncSessionsRef.current.delete(sessionId);
+        return;
+      }
+      setFlash(true);
+      playShutter();
+      const localPhoto = { data, filter: togetherSelected };
+      setSyncedLocalPhotos(old => {
+        const next = [...old];
+        next[index] = localPhoto;
+        return next;
+      });
+      dataConnectionsRef.current.forEach(connection => {
+        if (connection.open) connection.send({ type: 'Y2K_SYNC_PHOTO', sessionId, index, data, filter: togetherSelected });
+      });
+      setFlash(false);
+    }
+    setTimer(0);
+    setTimeout(() => syncSessionsRef.current.delete(sessionId), 30000);
+  };
+
   const syncShutter = () => {
+    if (syncBusyRef.current || !remoteReady || !dataReady) return;
+    syncBusyRef.current = true;
+    const sessionId = crypto.randomUUID();
+    const count = mode === 'strip' ? 4 : 1;
+    setSyncedLocalPhotos([]);
+    setSyncedRemotePhotos([]);
     dataConnectionsRef.current.forEach(connection => {
-      if (connection.open) connection.send('Y2K_SYNC_SHUTTER');
+      if (connection.open) connection.send({ type: 'Y2K_SYNC_SHUTTER', sessionId, count });
     });
-    takePhoto(togetherSelected, togetherIntensity);
+    runSyncedCapture(sessionId, count).finally(() => { syncBusyRef.current = false; });
   };
 
   const handleMainShutter = () => {
@@ -553,7 +616,8 @@ function App() {
           <span className="brand-mark">✳</span><span>Y2K<span className="brand-light">CAMERA</span></span>
         </a>
         <div className="top-meta"><span className="live-dot"></span> DIGITAL PHOTO STUDIO <span className="meta-divider">/</span> EST. 2004</div>
-        <div className="top-actions"><nav className="main-tabs" aria-label="Main sections"><button className={activeTab==='camera'?'active':''} onClick={()=>setActiveTab('camera')}>📷 <span>CAMERA</span></button><button className={activeTab==='together'?'active':''} onClick={()=>setActiveTab('together')}>♡ <span>TOGETHER</span>{roomStatus==='connected'&&<i className="tab-live-dot"/>}</button></nav><button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button><button className="settings-icon-button" onClick={()=>setSettingsOpen(true)} aria-label="Open settings" title="Settings"><span></span><span></span><span></span></button></div>
+        <nav className="main-tabs" aria-label="Main sections"><button type="button" className={activeTab==='camera'?'active':''} aria-pressed={activeTab==='camera'} onClick={()=>setActiveTab('camera')}>📷 <span>CAMERA</span></button><button type="button" className={activeTab==='together'?'active':''} aria-pressed={activeTab==='together'} onClick={()=>setActiveTab('together')}>♡ <span>TOGETHER</span>{roomStatus==='connected'&&<i className="tab-live-dot"/>}</button></nav>
+        <div className="top-actions"><button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button><button className="settings-icon-button" onClick={()=>setSettingsOpen(true)} aria-label="Open settings" title="Settings"><span></span><span></span><span></span></button></div>
       </header>
 
       <main>
@@ -677,7 +741,17 @@ function App() {
             {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Your Together filter is independent from the solo camera. Choose a look below; it applies to your preview and your saved synced photo.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
 
           </div>
-                      <section className="together-filter-panel"><div className="together-filter-head"><div><span className="room-kicker">YOUR TOGETHER LOOK</span><h3>{togetherActiveFilter.name}</h3></div><label>STRENGTH <b>{togetherIntensity}%</b><input type="range" min="0" max="100" value={togetherIntensity} onChange={e=>setTogetherIntensity(Number(e.target.value))}/></label></div><label className="filter-category-label">FILTER COLLECTION<select value={togetherGroup} onChange={e=>setTogetherGroup(e.target.value)}>{GROUPS.map(g=><option key={g} value={g}>{g==='ALL'?'All filters':g.charAt(0)+g.slice(1).toLowerCase()}</option>)}</select></label><div className="together-filter-grid">{togetherVisibleFilters.map((filter,index)=><button key={filter.name} className={cx('filter-tile redesigned-filter-tile',togetherSelected===filter.name&&'chosen')} onClick={()=>setTogetherSelected(filter.name)}><span className="filter-index">{String(index+1).padStart(2,'0')}</span><span className="filter-name">{filter.name}</span><span className="filter-group">{filter.group}</span><span className="filter-select-mark">{togetherSelected===filter.name?'SELECTED':'USE FILTER'}</span></button>)}</div></section>
+                      {syncedLocalPhotos.length > 0 && <section className="synced-results" aria-live="polite">
+            <div className="synced-results-head"><div><span className="room-kicker">BOTH CAMERAS · SHARED RESULT</span><h3>{syncedCaptureLabel}</h3></div><span>{syncedRemotePhotos.filter(Boolean).length}/{syncedLocalPhotos.filter(Boolean).length} RECEIVED</span></div>
+            {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
+              <figure><img src={syncedLocalPhotos[0]?.data} alt="Your synchronized photo"/><figcaption>YOU · {syncedLocalPhotos[0]?.filter}</figcaption></figure>
+              <figure>{syncedRemotePhotos[0]?.data ? <img src={syncedRemotePhotos[0].data} alt="Your partner's synchronized photo"/> : <div className="synced-pending">Waiting for the other photo…</div>}<figcaption>YOUR PERSON · {syncedRemotePhotos[0]?.filter || 'RECEIVING'}</figcaption></figure>
+            </div> : <div className="synced-strip">
+              <div className="synced-strip-label">YOU · TOP ROW</div><div className="synced-strip-row">{[0,1,2,3].map(i=><div key={'local'+i}>{syncedLocalPhotos[i]?.data ? <img src={syncedLocalPhotos[i].data} alt={'Your strip photo '+(i+1)}/> : <span className="synced-pending">…</span>}</div>)}</div>
+              <div className="synced-strip-label">YOUR PERSON · BOTTOM ROW</div><div className="synced-strip-row">{[0,1,2,3].map(i=><div key={'remote'+i}>{syncedRemotePhotos[i]?.data ? <img src={syncedRemotePhotos[i].data} alt={'Your partner strip photo '+(i+1)}/> : <span className="synced-pending">…</span>}</div>)}</div>
+            </div>}
+          </section>}
+          <section className="together-filter-panel"><div className="together-filter-head"><div><span className="room-kicker">YOUR TOGETHER LOOK</span><h3>{togetherActiveFilter.name}</h3></div><label>STRENGTH <b>{togetherIntensity}%</b><input type="range" min="0" max="100" value={togetherIntensity} onChange={e=>setTogetherIntensity(Number(e.target.value))}/></label></div><label className="filter-category-label">FILTER COLLECTION<select value={togetherGroup} onChange={e=>setTogetherGroup(e.target.value)}>{GROUPS.map(g=><option key={g} value={g}>{g==='ALL'?'All filters':g.charAt(0)+g.slice(1).toLowerCase()}</option>)}</select></label><div className="together-filter-grid">{togetherVisibleFilters.map((filter,index)=><button key={filter.name} className={cx('filter-tile redesigned-filter-tile',togetherSelected===filter.name&&'chosen')} onClick={()=>setTogetherSelected(filter.name)}><span className="filter-index">{String(index+1).padStart(2,'0')}</span><span className="filter-name">{filter.name}</span><span className="filter-group">{filter.group}</span><span className="filter-select-mark">{togetherSelected===filter.name?'SELECTED':'USE FILTER'}</span></button>)}</div></section>
           {roomError && <div className="room-error">{roomError}</div>}{meetingMessage && <div className="room-success" role="status">{meetingMessage}</div>}
           <div className="room-privacy">⌑ SHARE CODE ONLY WITH YOUR PERSON <span>·</span> HOST APPROVAL REQUIRED <span>·</span> VIDEO IS PEER-TO-PEER</div>
         </section>}
