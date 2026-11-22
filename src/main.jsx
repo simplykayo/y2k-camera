@@ -48,6 +48,7 @@ const FILTERS = [
 
 const GROUPS = ['ALL', 'Y2K', 'FILM', 'COLOR', 'DREAM', 'RETRO', 'ODD', 'MOOD', 'MONO'];
 const THEMES = [['Silver 2004','silver'],['Bubblegum','bubblegum'],['Cyber Lime','cyber-lime'],['Midnight Blue','midnight-blue'],['Cherry Chrome','cherry-chrome'],['Lavender Haze','lavender-haze'],['Sunset Blvd','sunset'],['Mint Condition','mint'],['Violet Arcade','violet'],['Desert Sand','desert'],['Toxic Green','toxic'],['Ocean Drive','ocean'],['Cocoa Club','cocoa'],['Red Alert','red'],['Mono Noir','noir']].map(([name,id])=>({name,id}));
+const STYLES = [{name:'Y2K Original',id:'y2k',description:'Chrome camera · retro controls'},{name:'Editorial',id:'editorial',description:'Clean magazine layout'},{name:'Studio',id:'studio',description:'Dark pro-photo workspace'},{name:'Terminal',id:'terminal',description:'Monospace cyber console'},{name:'Scrapbook',id:'scrapbook',description:'Printed memories · paper edges'},{name:'Minimal',id:'minimal',description:'Quiet, modern and spacious'}];
 const cx = (...items) => items.filter(Boolean).join(' ');
 
 function filterAtIntensity(filter, strength) {
@@ -99,7 +100,8 @@ function App() {
   const [roomMode, setRoomMode] = useState('call');
   const [incomingCall, setIncomingCall] = useState(null);
   const [remoteFilter, setRemoteFilter] = useState({ name: 'Original', intensity: 100 });
-  const [settingsOpen,setSettingsOpen]=useState(true);
+  const [settingsOpen,setSettingsOpen]=useState(false);
+  const [style,setStyle]=useState('y2k');
   const [theme,setTheme]=useState('silver');
   const [devices,setDevices]=useState({audioinput:[],videoinput:[],audiooutput:[]});
   const [micEnabled,setMicEnabled]=useState(true);
@@ -509,21 +511,17 @@ function App() {
   const deleteGalleryItem = id => setGallery(old => old.filter(item => item.id !== id));
 
   return (
-    <div className="app-shell" data-theme={theme}>
+    <div className="app-shell" data-theme={theme} data-style={style}>
       <header className="topbar">
         <a className="brand" href="#" aria-label="Y2K Camera home">
           <span className="brand-mark">✳</span><span>Y2K<span className="brand-light">CAMERA</span></span>
         </a>
         <div className="top-meta"><span className="live-dot"></span> DIGITAL PHOTO STUDIO <span className="meta-divider">/</span> EST. 2004</div>
-        <div className="top-actions"><button className="top-pill together-pill" onClick={() => setTogetherOpen(!togetherOpen)}>♡ TOGETHER</button><button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button></div>
+        <div className="top-actions"><button className="top-pill together-pill" onClick={() => setTogetherOpen(!togetherOpen)}>TOGETHER</button><button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button><button className="settings-icon-button" onClick={()=>setSettingsOpen(true)} aria-label="Open settings" title="Settings"><span></span><span></span><span></span></button></div>
       </header>
 
       <main>
-        <section className="intro">
-          <div className="eyebrow"><span>✦</span> YOUR LITTLE CORNER OF THE INTERNET</div>
-          <h1>Make a little <em>moment.</em></h1>
-          <p>A digital camera for the pictures you’ll keep forever.</p>
-        </section>
+        <section className="intro"><div><h1>Y2K Camera</h1><p>A little digital camera for keeping the good bits.</p></div><div className="appearance-bar"><label>STYLE<select value={style} onChange={e=>setStyle(e.target.value)}>{STYLES.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>THEME<select value={theme} onChange={e=>setTheme(e.target.value)}>{THEMES.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label></div></section>
 
         <div className="studio-grid">
           <section className="camera-column">
@@ -572,49 +570,34 @@ function App() {
                 <div className="segmented"><button className={mode==='single'?'selected':''} onClick={() => setMode('single')}>SINGLE</button><button className={mode==='strip'?'selected':''} onClick={() => setMode('strip')}>4-SHOT STRIP</button></div>
               </div>
             </div>
+            <section className="camera-options-panel"><div className="camera-options-heading"><div><span>CAMERA OPTIONS</span><small>Fine-tune your preview</small></div><span className="camera-option-count">05 CONTROLS</span></div>
+              <div className="camera-option-toggles"><label><input type="checkbox" checked={mirrorPreview} onChange={e=>setMirrorPreview(e.target.checked)}/> Mirror selfie</label><label><input type="checkbox" checked={showGrid} onChange={e=>setShowGrid(e.target.checked)}/> Composition grid</label><label><input type="checkbox" checked={dateStamp} onChange={e=>setDateStamp(e.target.checked)}/> Date overlay</label><label><input type="checkbox" checked={lowLight} onChange={e=>setLowLight(e.target.checked)}/> Low-light guide</label></div>
+              <label className="exposure-control"><span>EXPOSURE <b>{exposure>0?'+':''}{exposure}</b></span><input className="setting-range" type="range" min="-40" max="40" value={exposure} onChange={e=>setExposure(Number(e.target.value))}/></label>
+              <div className="camera-extra-note">YOUR CAMERA STAYS LOCAL · PHOTOS ARE SAVED TO YOUR ROLL</div>
+            </section>
           </section>
 
           <aside className="filters-column">
-            <div className="section-head"><span><i className="tiny-square pink"></i> THE FILTER DRAWER</span><span className="mono-label">{FILTERS.length} PRESETS</span></div>
-            <div className="filter-panel">
-              <div className="filter-feature">
-                <div className="filter-preview"><div className="preview-swatch" style={{filter:activeFilter.css}}><span>✳</span></div><div className="preview-label">NOW SELECTED</div></div>
-                <div className="filter-current"><span className="mini-kicker">CURRENT FILTER</span><h2>{activeFilter.name}</h2><p>{activeFilter.group} COLLECTION</p></div>
-              </div>
-              <div className="intensity-control"><div><label>FILTER STRENGTH</label><b>{intensity}%</b></div><input type="range" min="0" max="100" value={intensity} onChange={e => setIntensity(Number(e.target.value))}/></div>
-              <div className="filter-tabs">{GROUPS.map(g => <button key={g} onClick={() => setGroup(g)} className={group===g?'active':''}>{g}</button>)}</div>
-              <div className="filter-grid">
-                {visibleFilters.map((filter,index) => <button key={filter.name} className={cx('filter-tile',selected===filter.name && 'chosen')} onClick={() => setSelected(filter.name)}>
-                  <span className="filter-thumb" style={{filter:filter.css}}><i>{['✳','✦','♡','⁕','☼'][index%5]}</i></span>
-                  <span className="filter-name">{filter.name}</span>
-                  <span className="filter-group">{filter.group}</span>
-                </button>)}
-              </div>
+            <div className="section-head"><span>FILTER LIBRARY</span><span className="mono-label">{FILTERS.length} LOOKS</span></div>
+            <div className="filter-panel redesigned-filters">
+              <div className="filter-current"><span className="mini-kicker">YOU ARE USING</span><h2>{activeFilter.name}</h2><p>{activeFilter.group} · {intensity}% STRENGTH</p></div>
+              <div className="intensity-control"><div><label>FILTER STRENGTH</label><b>{intensity}%</b></div><input type="range" min="0" max="100" value={intensity} onChange={e=>setIntensity(Number(e.target.value))}/></div>
+              <label className="filter-category-label">BROWSE A COLLECTION<select value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g} value={g}>{g==='ALL'?'All filters':g.charAt(0)+g.slice(1).toLowerCase()}</option>)}</select></label>
+              <div className="filter-grid redesigned-filter-grid">{visibleFilters.map((filter,index)=><button key={filter.name} className={cx('filter-tile redesigned-filter-tile',selected===filter.name&&'chosen')} onClick={()=>setSelected(filter.name)}><span className="filter-index">{String(index+1).padStart(2,'0')}</span><span className="filter-name">{filter.name}</span><span className="filter-group">{filter.group}</span><span className="filter-select-mark">{selected===filter.name?'SELECTED':'USE FILTER'}</span></button>)}</div>
             </div>
           </aside>
-
-        <aside className="settings-column">
-          <div className="section-head"><span><i className="tiny-square pink"></i> SETTINGS & THEMES</span><button className="text-button" onClick={()=>setSettingsOpen(!settingsOpen)}>{settingsOpen?'HIDE':'SHOW'}</button></div>
-          {settingsOpen && <div className="settings-panel">
-            <section className="settings-section"><span className="settings-kicker">CALL CONTROLS</span>
-              <div className="device-actions"><button className={cx('device-toggle',micEnabled&&'enabled')} onClick={toggleMic}>♫ {micEnabled?'MIC ON':'MIC OFF'}</button><button className={cx('device-toggle',videoEnabled&&'enabled')} onClick={toggleVideo}>▣ {videoEnabled?'VIDEO ON':'VIDEO OFF'}</button></div>
-              <label className="setting-label">MICROPHONE INPUT</label><select value={audioInput} onChange={e=>changeInput('audio',e.target.value)}><option value="">System default</option>{devices.audioinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Microphone '+(i+1)}</option>)}</select>
-              <label className="setting-label">CAMERA INPUT</label><select value={videoInput} onChange={e=>changeInput('video',e.target.value)}><option value="">Current camera</option>{devices.videoinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Camera '+(i+1)}</option>)}</select>
-              <label className="setting-label">AUDIO OUTPUT</label><select value={audioOutput} onChange={e=>changeOutput(e.target.value)}><option value="">System default</option>{devices.audiooutput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Speaker '+(i+1)}</option>)}</select>
-            </section>
-            <section className="settings-section"><span className="settings-kicker">15 INTERFACE THEMES</span><div className="theme-grid">{THEMES.map(t=><button key={t.id} className={cx('theme-swatch',theme===t.id&&'active')} data-swatch={t.id} onClick={()=>setTheme(t.id)}><i/><span>{t.name}</span></button>)}</div></section>
-            <section className="settings-section"><span className="settings-kicker">CAMERA & BASIC OPTIONS</span>
-              <label className="setting-check"><input type="checkbox" checked={mirrorPreview} onChange={e=>setMirrorPreview(e.target.checked)}/> Mirror selfie preview</label>
-              <label className="setting-check"><input type="checkbox" checked={showGrid} onChange={e=>setShowGrid(e.target.checked)}/> Rule-of-thirds grid</label>
-              <label className="setting-check"><input type="checkbox" checked={dateStamp} onChange={e=>setDateStamp(e.target.checked)}/> Date stamp overlay</label>
-              <label className="setting-check"><input type="checkbox" checked={lowLight} onChange={e=>setLowLight(e.target.checked)}/> Low-light preview aid</label>
-              <label className="setting-label">EXPOSURE <b>{exposure>0?'+':''}{exposure}</b></label><input className="setting-range" type="range" min="-40" max="40" value={exposure} onChange={e=>setExposure(Number(e.target.value))}/>
-              <button className="settings-reset" onClick={()=>{setTheme('silver');setMirrorPreview(true);setShowGrid(false);setDateStamp(false);setLowLight(false);setExposure(0);}}>RESET SETTINGS</button>
-            </section>
-          </div>}
-        </aside>
         </div>
-        {togetherOpen && <section className="together-panel">
+                {settingsOpen && <div className="settings-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSettingsOpen(false);}}><section className="settings-dialog" role="dialog" aria-modal="true" aria-label="Camera settings"><div className="settings-dialog-head"><div><span>CONTROL ROOM</span><h2>Settings</h2><p>Devices, sound and your camera setup.</p></div><button onClick={()=>setSettingsOpen(false)} aria-label="Close settings">×</button></div>
+          <div className="settings-dialog-grid"><section className="settings-section"><span className="settings-kicker">CALL DEVICES</span><div className="device-actions"><button className={cx('device-toggle',micEnabled&&'enabled')} onClick={toggleMic}>{micEnabled?'Microphone on':'Microphone off'}</button><button className={cx('device-toggle',videoEnabled&&'enabled')} onClick={toggleVideo}>{videoEnabled?'Camera on':'Camera off'}</button></div>
+            <label className="setting-label">MICROPHONE INPUT</label><select value={audioInput} onChange={e=>changeInput('audio',e.target.value)}><option value="">System default</option>{devices.audioinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Microphone '+(i+1)}</option>)}</select>
+            <label className="setting-label">CAMERA INPUT</label><select value={videoInput} onChange={e=>changeInput('video',e.target.value)}><option value="">Current camera</option>{devices.videoinput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Camera '+(i+1)}</option>)}</select>
+            <label className="setting-label">AUDIO OUTPUT</label><select value={audioOutput} onChange={e=>changeOutput(e.target.value)}><option value="">System default</option>{devices.audiooutput.map((d,i)=><option key={d.deviceId||i} value={d.deviceId}>{d.label||'Speaker '+(i+1)}</option>)}</select>
+            <p className="settings-hint">Some browsers only show device names after camera or microphone permission is granted.</p></section>
+            <section className="settings-section settings-appearance-section"><span className="settings-kicker">APPEARANCE</span><label className="setting-label">WEBSITE STYLE</label><select value={style} onChange={e=>setStyle(e.target.value)}>{STYLES.map(s=><option key={s.id} value={s.id}>{s.name} — {s.description}</option>)}</select><label className="setting-label">COLOUR THEME</label><select value={theme} onChange={e=>setTheme(e.target.value)}>{THEMES.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <div className="settings-theme-preview"><span className="theme-preview-chip"></span><div><b>{STYLES.find(s=>s.id===style)?.name}</b><small>{THEMES.find(t=>t.id===theme)?.name} colour theme</small></div></div>
+            <button className="settings-reset" onClick={()=>{setTheme('silver');setStyle('y2k');setMicEnabled(true);setVideoEnabled(true);setAudioInput('');setVideoInput('');setAudioOutput('');}}>RESET SETTINGS</button></section></div>
+          </section></div>}
+                {togetherOpen && <section className="together-panel">
           <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><button className="text-button" onClick={() => setTogetherOpen(false)}>CLOSE ×</button></div>
           <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
           {roomStatus==='idle' || roomStatus==='error' ? <div className="room-entry">
