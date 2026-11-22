@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import Peer from 'peerjs';
 
 const FILTERS = [
   { name:'Original', group:'BASICS', css:'none', tint:null },
@@ -81,6 +82,20 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
+  const peerRef = useRef(null);
+  const callRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const localRoomVideoRef = useRef(null);
+  const dataConnectionsRef = useRef([]);
+  const [togetherOpen, setTogetherOpen] = useState(false);
+  const [roomStatus, setRoomStatus] = useState('idle');
+  const [roomLink, setRoomLink] = useState('');
+  const [joinInput, setJoinInput] = useState('');
+  const [remoteReady, setRemoteReady] = useState(false);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [dataReady, setDataReady] = useState(false);
+  const [roomError, setRoomError] = useState('');
+  const [roomMode, setRoomMode] = useState('call');
 
   const activeFilter = useMemo(() => FILTERS.find(f => f.name === selected) || FILTERS[0], [selected]);
   const visibleFilters = useMemo(() => group === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === group), [group]);
@@ -119,8 +134,27 @@ function App() {
 
   useEffect(() => {
     startCamera('user');
-    return () => streamRef.current?.getTracks().forEach(track => track.stop());
+    const match = window.location.hash.match(/(?:^#|&)room=([^&]+)/);
+    if (match) { setJoinInput(window.location.href); setTogetherOpen(true); }
+    return () => {
+      peerRef.current?.destroy();
+      streamRef.current?.getTracks().forEach(track => track.stop());
+    };
   }, []);
+
+  useEffect(() => {
+    if (cameraReady && togetherOpen && localRoomVideoRef.current && streamRef.current) {
+      localRoomVideoRef.current.srcObject = streamRef.current;
+      localRoomVideoRef.current.play().catch(() => {});
+    }
+  }, [cameraReady, togetherOpen, roomStatus]);
+
+  useEffect(() => {
+    if (remoteStream && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStream;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [remoteStream, remoteReady]);
 
   const playShutter = () => {
     if (!sound) return;
@@ -190,6 +224,132 @@ function App() {
     }
     setBusy(false);
   };
+  const attachRemoteCall = call => {
+    callRef.current = call;
+    call.on('stream', stream => {
+      setRemoteStream(stream);
+      setRemoteReady(true);
+      setRoomStatus('connected');
+    });
+    call.on('close', () => { setRemoteReady(false); setRemoteStream(null); setDataReady(false); setRoomStatus('waiting'); });
+    call.on('error', error => setRoomError(error.message || 'The video connection had a problem.'));
+  };
+
+  const prepareRoomCamera = async () => {
+    stopCamera();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+      video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    streamRef.current = stream;
+    if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+    setCameraReady(true);
+    return stream;
+  };
+
+  const setupDataConnection = connection => {
+    dataConnectionsRef.current.push(connection);
+    if (connection.open) setDataReady(true);
+    connection.on('open', () => setDataReady(true));
+    connection.on('data', message => {
+      if (message === 'Y2K_SYNC_SHUTTER') takePhoto();
+    });
+    connection.on('close', () => {
+      dataConnectionsRef.current = dataConnectionsRef.current.filter(item => item !== connection);
+      if (!dataConnectionsRef.current.some(item => item.open)) setDataReady(false);
+    });
+  };
+
+  const createRoom = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
+    try {
+      setRoomError('');
+      setRoomStatus('starting');
+      const stream = await prepareRoomCamera();
+      const peer = new Peer();
+      peerRef.current = peer;
+      peer.on('open', id => {
+        const link = window.location.origin + window.location.pathname + '#room=' + encodeURIComponent(id);
+        setRoomLink(link);
+        setRoomStatus('waiting');
+      });
+      peer.on('call', call => {
+        call.answer(stream);
+        attachRemoteCall(call);
+      });
+      peer.on('connection', setupDataConnection);
+      peer.on('error', error => {
+        setRoomError(error.type === 'unavailable-id' ? 'Could not create a room. Please try again.' : (error.message || 'Room connection error.'));
+        setRoomStatus('error');
+      });
+    } catch (error) {
+      setRoomError(error.name === 'NotAllowedError' ? 'Allow camera and microphone access to start a room.' : (error.message || 'Could not start your camera.'));
+      setRoomStatus('error');
+    }
+  };
+
+  const joinRoom = async () => {
+    let targetId = joinInput.trim();
+    try {
+      if (targetId.includes('://')) targetId = new URL(targetId).hash.match(/(?:^#|&)room=([^&]+)/)?.[1] || '';
+      else if (targetId.startsWith('#')) targetId = targetId.match(/room=([^&]+)/)?.[1] || '';
+      targetId = decodeURIComponent(targetId);
+    } catch { targetId = ''; }
+    if (!targetId) { setRoomError('Paste a valid invite link from the person hosting the room.'); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
+    try {
+      setRoomError('');
+      setRoomStatus('joining');
+      const stream = await prepareRoomCamera();
+      const peer = new Peer();
+      peerRef.current = peer;
+      peer.on('open', () => {
+        const call = peer.call(targetId, stream);
+        if (!call) { setRoomError('Could not reach that room. Ask for a fresh invite link.'); setRoomStatus('error'); return; }
+        attachRemoteCall(call);
+        const connection = peer.connect(targetId, { reliable: true });
+        connection.on('open', () => setupDataConnection(connection));
+      });
+      peer.on('error', error => {
+        setRoomError(error.type === 'peer-unavailable' ? 'That room is offline. Ask the host to create a new invite.' : (error.message || 'Could not join the room.'));
+        setRoomStatus('error');
+      });
+    } catch (error) {
+      setRoomError(error.name === 'NotAllowedError' ? 'Allow camera and microphone access to join the room.' : (error.message || 'Could not join the room.'));
+      setRoomStatus('error');
+    }
+  };
+
+  const syncShutter = () => {
+    dataConnectionsRef.current.forEach(connection => {
+      if (connection.open) connection.send('Y2K_SYNC_SHUTTER');
+    });
+    takePhoto();
+  };
+
+  const leaveRoom = () => {
+    callRef.current?.close();
+    peerRef.current?.destroy();
+    peerRef.current = null;
+    callRef.current = null;
+    dataConnectionsRef.current = [];
+    setRemoteReady(false);
+    setRemoteStream(null);
+    setDataReady(false);
+    setRoomStatus('idle');
+    setRoomLink('');
+    setRoomError('');
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (localRoomVideoRef.current) localRoomVideoRef.current.srcObject = null;
+    stopCamera();
+    startCamera(facing);
+  };
+
+  const copyRoomLink = async () => {
+    try { await navigator.clipboard.writeText(roomLink); }
+    catch { setRoomError('Could not copy automatically. Select and copy the invite link.'); }
+  };
+
 
   const makeStrip = async () => {
     if (shots.length === 0) return;
@@ -261,7 +421,7 @@ function App() {
           <span className="brand-mark">✳</span><span>Y2K<span className="brand-light">CAMERA</span></span>
         </a>
         <div className="top-meta"><span className="live-dot"></span> DIGITAL PHOTO STUDIO <span className="meta-divider">/</span> EST. 2004</div>
-        <button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button>
+        <div className="top-actions"><button className="top-pill together-pill" onClick={() => setTogetherOpen(!togetherOpen)}>♡ TOGETHER</button><button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button></div>
       </header>
 
       <main>
@@ -337,6 +497,24 @@ function App() {
           </aside>
         </div>
 
+        {togetherOpen && <section className="together-panel">
+          <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><button className="text-button" onClick={() => setTogetherOpen(false)}>CLOSE ×</button></div>
+          <div className="together-intro"><div><span className="room-kicker">PRIVATE PHOTO ROOM · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Make a room, send the invite link, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
+          {roomStatus==='idle' || roomStatus==='error' ? <div className="room-entry">
+            <div className="room-create"><span className="room-number">01 / HOST</span><h3>Start a private room</h3><p>Create a one-time invite link. Keep it between you two.</p><button className="primary-button" onClick={createRoom}>CREATE INVITE LINK ↗</button></div>
+            <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Paste the room link your person sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value)} placeholder="Paste private room invite link…" /><button className="secondary-room-button" onClick={joinRoom}>JOIN THEIR ROOM ↗</button></div>
+          </div> : <div className="room-active">
+            {roomLink && <div className="invite-box"><div><span className="room-number">YOUR PRIVATE INVITE LINK</span><code>{roomLink}</code></div><button className="primary-button" onClick={copyRoomLink}>COPY LINK ↗</button></div>}
+            <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
+            <div className="room-feeds">
+              <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline/><span>YOU · CAM 01</span></div>
+              <div className="room-feed remote-feed">{remoteReady ? <video ref={remoteVideoRef} autoPlay playsInline/> : <div className="waiting-feed"><b>♡</b><span>WAITING FOR YOUR PERSON</span><small>Send them your private invite link</small></div>}<span>YOUR PERSON · CAM 02</span></div>
+            </div>
+            {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Pick your filter and timer in the camera studio, then capture both cameras at once.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
+          </div>}
+          {roomError && <div className="room-error">{roomError}</div>}
+          <div className="room-privacy">⌑ INVITE-LINK ACCESS ONLY <span>·</span> VIDEO IS PEER-TO-PEER <span>·</span> NO PHOTO UPLOADS</div>
+        </section>}
         <section className="results-section">
           <div className="section-head"><span><i className="tiny-square"></i> YOUR CONTACT SHEET</span><span className="mono-label">{shots.length} / 4 FRAMES</span></div>
           <div className="contact-sheet">
