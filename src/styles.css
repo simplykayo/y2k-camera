@@ -482,3 +482,5 @@ footer b{color:#245b91;margin-left:5px}
  .app-shell .synced-mode-picker{width:100%}
  .app-shell .synced-mode-picker button{flex:1;padding:9px 7px}
 }
+
+.app-shell>.topbar>.top-meta{display:none}
