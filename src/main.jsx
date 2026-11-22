@@ -206,6 +206,8 @@ function App() {
       const constraints=kind==='video'?{video:{deviceId:{exact:id},width:{ideal:1280},height:{ideal:720}},audio:!!old?.getAudioTracks().length}:{audio:{deviceId:{exact:id}},video:!!old?.getVideoTracks().length};
       const fresh=await navigator.mediaDevices.getUserMedia(constraints);
       const track=kind==='video'?fresh.getVideoTracks()[0]:fresh.getAudioTracks()[0];
+      fresh.getTracks().filter(t=>t!==track).forEach(t=>t.stop());
+      track.enabled=kind==='video'?videoEnabled:true;
       const previous=kind==='video'?old?.getVideoTracks()[0]:old?.getAudioTracks()[0];
       if(previous){old.removeTrack(previous);previous.stop();} if(old)old.addTrack(track);else streamRef.current=fresh;
       if(kind==='video'){setVideoInput(id);[videoRef.current,localRoomVideoRef.current].forEach(v=>{if(v){v.srcObject=streamRef.current;v.play().catch(()=>{});}});}else{setAudioInput(id);setMicEnabled(true);}
@@ -240,7 +242,7 @@ function App() {
     const ctx = canvas.getContext('2d');
     ctx.save();
     if (facing === 'user') { ctx.translate(width, 0); ctx.scale(-1, 1); }
-    ctx.filter = filterAtIntensity(activeFilter.css, intensity);
+    ctx.filter = filterAtIntensity(activeFilter.css, intensity) + ' brightness(' + (1 + exposure/100) + ')';
     ctx.drawImage(video, 0, 0, width, height);
     ctx.restore();
     if (activeFilter.tint && activeFilter.alpha) {
