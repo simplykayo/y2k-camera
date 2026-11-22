@@ -47,6 +47,8 @@ const FILTERS = [
 ];
 
 const GROUPS = ['ALL', 'Y2K', 'FILM', 'COLOR', 'DREAM', 'RETRO', 'ODD', 'MOOD', 'MONO'];
+const ROOM_STORAGE_KEY = 'y2k-camera-room-v1';
+const makeRoomCode = () => { const limit = Math.floor(0x100000000 / 900000) * 900000; const values = new Uint32Array(1); let value; do { crypto.getRandomValues(values); value = values[0]; } while (value >= limit); return String(100000 + (value % 900000)); };
 const THEMES = [['Silver 2004','silver'],['Bubblegum','bubblegum'],['Cyber Lime','cyber-lime'],['Midnight Blue','midnight-blue'],['Cherry Chrome','cherry-chrome'],['Lavender Haze','lavender-haze'],['Sunset Blvd','sunset'],['Mint Condition','mint'],['Violet Arcade','violet'],['Desert Sand','desert'],['Toxic Green','toxic'],['Ocean Drive','ocean'],['Cocoa Club','cocoa'],['Red Alert','red'],['Mono Noir','noir']].map(([name,id])=>({name,id}));
 const STYLES = [{name:'Y2K Camera',id:'y2k',description:'Retro point-and-shoot interface'},{name:'Editorial Magazine',id:'editorial',description:'A photo journal with a magazine layout'},{name:'Darkroom Studio',id:'studio',description:'A pro camera workstation'},{name:'Terminal OS',id:'terminal',description:'A retro computer interface'},{name:'Scrapbook',id:'scrapbook',description:'A tactile memory book'},{name:'Minimal Modern',id:'minimal',description:'A clean, borderless camera app'},{name:'Google Meet',id:'meet',description:'A familiar, clean video meeting layout'}];
 const cx = (...items) => items.filter(Boolean).join(' ');
@@ -105,6 +107,9 @@ function App() {
   const [togetherGroup, setTogetherGroup] = useState('ALL');
   const [roomStatus, setRoomStatus] = useState('idle');
   const [roomCode, setRoomCode] = useState('');
+  const [roomExpiresAt, setRoomExpiresAt] = useState(null);
+  const [roomSecondsLeft, setRoomSecondsLeft] = useState(0);
+  const [autoAcceptInvites, setAutoAcceptInvites] = useState(() => { try { return localStorage.getItem('y2k-auto-accept-invites') === 'true'; } catch { return false; } });
   const [joinInput, setJoinInput] = useState('');
   const [remoteReady, setRemoteReady] = useState(false);
   const [connectionQuality, setConnectionQuality] = useState({ level: 'checking', label: 'CHECKING', detail: 'Measuring connection' });
@@ -397,7 +402,7 @@ function App() {
     connection.on('open', () => { setDataReady(true); sendCurrentFilter(); });
     connection.on('data', message => {
       if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_SHUTTER') {
-        if (typeof message.sessionId === 'string' && message.sessionId.length <= 64 && [1, 4].includes(Number(message.count))) runSyncedCapture(message.sessionId, message.count);
+        if (typeof message.sessionId === 'string' && message.sessionId.length <= 64 && [1, 4].includes(Number(message.count))) { const delay = [0, 3, 5, 10].includes(Number(message.countdown)) ? Number(message.countdown) : 3; runSyncedCapture(message.sessionId, message.count, delay); }
         return;
       }
       if (message && typeof message === 'object' && message.type === 'Y2K_SYNC_PHOTO_CHUNK') {
@@ -442,28 +447,35 @@ function App() {
     });
   }, [togetherSelected, togetherIntensity]);
 
-  const createRoom = async () => {
+  const createRoom = async (resumeRecord = null) => {
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
     try {
       setRoomError('');
       isRoomHostRef.current = true;
       approvedPeerRef.current = '';
       setRoomStatus('starting');
-      const stream = await prepareRoomCamera();
-      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-      let code = '';
-      while (code.length < 6) { const bytes = crypto.getRandomValues(new Uint8Array(12)); for (const byte of bytes) { if (byte < 240) code += alphabet[byte % alphabet.length]; if (code.length === 6) break; } }
+      await prepareRoomCamera();
+      const code = resumeRecord?.code || makeRoomCode();
+      const expiresAt = resumeRecord?.expiresAt || (Date.now() + 10 * 60 * 1000);
+      setRoomExpiresAt(expiresAt);
+      setRoomSecondsLeft(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
+      try { localStorage.setItem(ROOM_STORAGE_KEY, JSON.stringify({ code, expiresAt })); } catch {}
       const peer = new Peer(code);
       peerRef.current = peer;
-      peer.on('open', id => {
-        setRoomCode(id);
-        setRoomStatus('waiting');
-      });
+      peer.on('open', id => { setRoomCode(id); setRoomStatus('waiting'); });
       peer.on('call', call => {
         if (approvedPeerRef.current && approvedPeerRef.current !== call.peer) { call.close(); return; }
         if (callRef.current || incomingCallRef.current) { call.close(); return; }
-        incomingCallRef.current = call;
-        setIncomingCall(call);
+        if (autoAcceptInvites) {
+          const stream = streamRef.current;
+          if (!stream) { call.close(); return; }
+          incomingCallRef.current = call;
+          approvedPeerRef.current = call.peer;
+          call.answer(stream);
+          attachRemoteCall(call);
+          pendingConnectionsRef.current.filter(connection => connection.peer === call.peer).forEach(setupDataConnection);
+          pendingConnectionsRef.current = pendingConnectionsRef.current.filter(connection => connection.peer !== call.peer);
+        } else { incomingCallRef.current = call; setIncomingCall(call); }
       });
       peer.on('connection', connection => {
         if (approvedPeerRef.current === connection.peer) setupDataConnection(connection);
@@ -471,7 +483,10 @@ function App() {
         else connection.close();
       });
       peer.on('error', error => {
-        setRoomError(error.type === 'unavailable-id' ? 'Could not create a room. Please try again.' : (error.message || 'Room connection error.'));
+        if (error.type === 'unavailable-id' && resumeRecord) {
+          try { localStorage.removeItem(ROOM_STORAGE_KEY); } catch {}
+          setRoomError('Your saved room code could not be reclaimed after refresh. Generate a new code.');
+        } else setRoomError(error.type === 'unavailable-id' ? 'That code is already in use. Generate a new one.' : (error.message || 'Room connection error.'));
         setRoomStatus('error');
       });
     } catch (error) {
@@ -480,9 +495,34 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(ROOM_STORAGE_KEY) || 'null'); } catch {}
+    if (saved && /^[0-9]{6}$/.test(saved.code || '') && Number.isFinite(saved.expiresAt) && saved.expiresAt > Date.now()) createRoom(saved);
+    else if (saved) { try { localStorage.removeItem(ROOM_STORAGE_KEY); } catch {} }
+  }, []);
+
+  useEffect(() => {
+    if (!roomExpiresAt || !isRoomHostRef.current) return;
+    const update = () => {
+      const remaining = Math.max(0, Math.ceil((roomExpiresAt - Date.now()) / 1000));
+      setRoomSecondsLeft(remaining);
+      if (remaining <= 0) {
+        peerRef.current?.destroy(); peerRef.current = null;
+        callRef.current?.close(); callRef.current = null;
+        try { localStorage.removeItem(ROOM_STORAGE_KEY); } catch {}
+        setRoomCode(''); setRoomExpiresAt(null); setRoomStatus('idle');
+        setRoomError('This room code expired after 10 minutes. Generate a new one.');
+      }
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [roomExpiresAt]);
+
   const joinRoom = async () => {
-    const targetId = joinInput.trim().toUpperCase().replace(/[^A-Z]/g, '');
-    if (!/^[A-HJ-NP-Z]{6}$/.test(targetId)) { setRoomError('Enter the 6-character room code.'); return; }
+    const targetId = joinInput.replace(/\D/g, '').slice(0, 6);
+    if (!/^[0-9]{6}$/.test(targetId)) { setRoomError('Enter the 6-digit room code.'); return; }
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
     try {
       setRoomError('');
@@ -490,7 +530,7 @@ function App() {
       approvedPeerRef.current = '';
       setRoomStatus('joining');
       const stream = await prepareRoomCamera();
-      const peer = new Peer();
+      const peer = new Peer(makeRoomCode());
       peerRef.current = peer;
       peer.on('open', () => {
         const call = peer.call(targetId, stream);
@@ -510,12 +550,13 @@ function App() {
   };
 
   const acceptIncomingCall = () => {
-    if (!incomingCall || !streamRef.current || (approvedPeerRef.current && approvedPeerRef.current !== incomingCall.peer)) return;
-    const approvedPeer = incomingCall.peer;
+    const call = incomingCall || incomingCallRef.current;
+    if (!call || !streamRef.current || (approvedPeerRef.current && approvedPeerRef.current !== call.peer)) return;
+    const approvedPeer = call.peer;
     incomingCallRef.current = null;
     approvedPeerRef.current = approvedPeer;
-    incomingCall.answer(streamRef.current);
-    attachRemoteCall(incomingCall);
+    call.answer(streamRef.current);
+    attachRemoteCall(call);
     pendingConnectionsRef.current.filter(connection => connection.peer === approvedPeer).forEach(setupDataConnection);
     pendingConnectionsRef.current = pendingConnectionsRef.current.filter(connection => connection.peer !== approvedPeer);
     setIncomingCall(null);
@@ -530,7 +571,7 @@ function App() {
     setIncomingCall(null);
   };
 
-  const runSyncedCapture = async (sessionId, requestedCount = 1) => {
+  const runSyncedCapture = async (sessionId, requestedCount = 1, requestedCountdown = countdown) => {
     if (!sessionId || syncSessionsRef.current.has(sessionId)) return;
     syncSessionsRef.current.add(sessionId);
     setSyncRunning(true);
@@ -540,8 +581,8 @@ function App() {
     setSyncedCaptureLabel(total === 4 ? 'FOUR-POSE CONNECTED PHOTO STRIP' : 'SYNCHRONIZED PHOTO PAIR');
     for (let index = 0; index < total; index++) {
       if (index > 0) await new Promise(resolve => setTimeout(resolve, 650));
-      setTimer(countdown);
-      for (let n = countdown; n > 0; n--) {
+      setTimer(requestedCountdown);
+      for (let n = requestedCountdown; n > 0; n--) {
         setTimer(n);
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
@@ -589,7 +630,7 @@ function App() {
     setSyncedLocalPhotos([]);
     setSyncedRemotePhotos([]);
     dataConnectionsRef.current.forEach(connection => {
-      if (connection.open) connection.send({ type: 'Y2K_SYNC_SHUTTER', sessionId, count });
+      if (connection.open) connection.send({ type: 'Y2K_SYNC_SHUTTER', sessionId, count, countdown });
     });
     runSyncedCapture(sessionId, count).finally(() => { syncBusyRef.current = false; setSyncRunning(false); });
   };
@@ -621,6 +662,9 @@ function App() {
     setDataReady(false);
     setRoomStatus('idle');
     setRoomCode('');
+    setRoomExpiresAt(null);
+    setRoomSecondsLeft(0);
+    try { localStorage.removeItem(ROOM_STORAGE_KEY); } catch {}
     setRoomError('');
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (localRoomVideoRef.current) localRoomVideoRef.current.srcObject = null;
@@ -632,7 +676,7 @@ function App() {
     try { await navigator.clipboard.writeText(roomCode); setMeetingMessage('Room code copied.'); }
     catch { setRoomError('Could not copy automatically. Select and copy the room code.'); }
   };
-  const copyInvite = async () => { try { await navigator.clipboard.writeText('Join my private camera room: '+roomCode+'\nOpen '+window.location.origin+' and enter this 6-character code.'); setMeetingMessage('Invite message copied.'); } catch { setRoomError('Could not copy the invite.'); } };
+  const copyInvite = async () => { try { await navigator.clipboard.writeText('Join my private camera room: '+roomCode+'\nOpen '+window.location.origin+' and enter this 6-digit code.'); setMeetingMessage('Invite message copied.'); } catch { setRoomError('Could not copy the invite.'); } };
   const toggleFullscreen = async () => { try { if(document.fullscreenElement) await document.exitFullscreen(); else await document.querySelector('.viewfinder')?.requestFullscreen(); } catch { setRoomError('Fullscreen is unavailable in this browser.'); } };
   const togglePiP = async () => { try { const video=videoRef.current; if(document.pictureInPictureElement) await document.exitPictureInPicture(); else if(video?.requestPictureInPicture) await video.requestPictureInPicture(); else setRoomError('Picture-in-picture is not supported here.'); } catch { setRoomError('Could not open picture-in-picture.'); } };
   const testSpeaker = () => { try { const Ctx=window.AudioContext||window.webkitAudioContext; const ctx=new Ctx(); const osc=ctx.createOscillator(); const gain=ctx.createGain(); osc.frequency.value=660; gain.gain.value=.08; osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime+.35); osc.onended=()=>ctx.close(); } catch { setRoomError('Speaker test is unavailable.'); } };
@@ -831,14 +875,15 @@ function App() {
           </section>}
         {activeTab === 'together' && <section className="together-panel">
           <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><span className="mono-label">PRIVATE ROOM</span></div>
-          <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span>{roomStatus==='connected' && <span className={'connection-quality quality-'+connectionQuality.level} title={connectionQuality.detail}><i></i><b>{connectionQuality.label}</b><small>{connectionQuality.detail}</small></span>}</div>
+          <div className="together-intro"><div><span className="room-kicker">6-DIGIT ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-digit code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span>{roomStatus==='connected' && <span className={'connection-quality quality-'+connectionQuality.level} title={connectionQuality.detail}><i></i><b>{connectionQuality.label}</b><small>{connectionQuality.detail}</small></span>}</div>
           {roomStatus==='idle' || roomStatus==='error' ? <div className="room-entry">
-            <div className="room-create"><span className="room-number">01 / HOST</span><h3>Start a private room</h3><p>Generate a 6-character code to share with your person.</p><button className="primary-button" onClick={createRoom}>GENERATE ROOM CODE ↗</button></div>
-            <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Enter the 6-character code they sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0,6))} placeholder="e.g. K7M2QX" maxLength={6} autoComplete="off" /><button className="secondary-room-button" onClick={joinRoom}>JOIN ROOM ↗</button></div>
+            <div className="room-create"><span className="room-number">01 / HOST</span><h3>Start a private room</h3><p>Generate a 6-digit code to share with your person.</p><button className="primary-button" onClick={createRoom}>GENERATE ROOM CODE ↗</button></div>
+            <div className="room-join"><span className="room-number">02 / JOIN</span><h3>Got an invite?</h3><p>Enter the 6-digit code they sent you.</p><input value={joinInput} onChange={e=>setJoinInput(e.target.value.replace(/\D/g, '').slice(0,6))} placeholder="e.g. 482915" maxLength={6} inputMode="numeric" autoComplete="off" /><button className="secondary-room-button" onClick={joinRoom}>JOIN ROOM ↗</button></div>
           </div> : <div className="room-active">
-            {roomCode && <div className="invite-box"><div><span className="room-number">YOUR ROOM CODE</span><code className="room-code-display">{roomCode}</code></div><button className="primary-button" onClick={copyRoomCode}>COPY CODE ↗</button><button className="secondary-room-button" onClick={copyInvite}>COPY INVITE MESSAGE</button></div>}
+            {roomCode && <div className="invite-box"><div><span className="room-number">YOUR ROOM CODE</span><code className="room-code-display">{roomCode}</code><small className="room-expiry-note">EXPIRES IN {Math.floor(roomSecondsLeft/60)}:{String(roomSecondsLeft%60).padStart(2,'0')}</small></div><button className="primary-button" onClick={copyRoomCode}>COPY CODE ↗</button><button className="secondary-room-button" onClick={copyInvite}>COPY INVITE MESSAGE</button><button className="secondary-room-button" onClick={()=>{if(window.confirm('Create a new code? Anyone using the current code will be disconnected.')){callRef.current?.close();peerRef.current?.destroy();peerRef.current=null;callRef.current=null;dataConnectionsRef.current=[];pendingConnectionsRef.current.forEach(c=>c.close());pendingConnectionsRef.current=[];approvedPeerRef.current='';incomingCallRef.current=null;setIncomingCall(null);setRemoteReady(false);setRemoteStream(null);setDataReady(false);setRoomCode('');setRoomExpiresAt(null);try{localStorage.removeItem(ROOM_STORAGE_KEY);}catch{}setRoomStatus('idle');createRoom();}}}>NEW CODE ↻</button></div>}
             {incomingCall && <div className="incoming-invite"><div><b>♡ SOMEONE WANTS TO JOIN</b><span>They are asking to join your private camera room.</span></div><button className="primary-button" onClick={acceptIncomingCall}>ACCEPT ↗</button><button className="secondary-room-button" onClick={rejectIncomingCall}>DECLINE ×</button></div>}
             <div className="room-view-tabs"><button className={roomMode==='call'?'active':''} onClick={()=>setRoomMode('call')}>VIDEO CALL</button><button className={roomMode==='camera'?'active':''} onClick={()=>setRoomMode('camera')}>CAMERA TOGETHER</button></div>
+            <div className="together-timer-control"><span>SYNC TIMER</span><div className="segmented">{[0,3,5,10].map(n=><button key={'together-timer-'+n} className={countdown===n?'selected':''} onClick={()=>setCountdown(n)}>{n===0?'OFF':n+'s'}</button>)}</div><label><input type="checkbox" checked={autoAcceptInvites} onChange={e=>{setAutoAcceptInvites(e.target.checked);try{localStorage.setItem('y2k-auto-accept-invites',String(e.target.checked));}catch{}}}/> AUTO-ACCEPT INVITES</label></div>
             <div className="together-device-controls"><button className={cx("meet-control",micEnabled&&"is-on")} onClick={toggleMic} aria-pressed={micEnabled}><span className="meet-control-icon">{micEnabled?"🎙":"🔇"}</span>{micEnabled?"MIC ON":"MIC OFF"}</button><button className={cx("meet-control",videoEnabled&&"is-on")} onClick={toggleVideo} aria-pressed={videoEnabled}><span className="meet-control-icon">{videoEnabled?"▣":"▧"}</span>{videoEnabled?"CAMERA ON":"CAMERA OFF"}</button><button className="secondary-room-button" onClick={switchCamera}>SWITCH CAMERA ↔</button></div>
             <div className="room-feeds">
               <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline style={{filter:filterAtIntensity(togetherActiveFilter.css,togetherIntensity)}}/><span>YOU · CAM 01</span></div>
