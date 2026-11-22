@@ -192,9 +192,14 @@ function App() {
   }, [cameraReady, roomStatus]);
 
   useEffect(() => {
-    if (cameraReady && activeTab === 'together' && localRoomVideoRef.current && streamRef.current) {
-      localRoomVideoRef.current.srcObject = streamRef.current;
-      localRoomVideoRef.current.play().catch(() => {});
+    const stream = streamRef.current;
+    if (!cameraReady || !stream) return;
+    const activeVideo = activeTab === 'together' ? localRoomVideoRef.current : videoRef.current;
+    const inactiveVideo = activeTab === 'together' ? videoRef.current : localRoomVideoRef.current;
+    if (inactiveVideo && inactiveVideo.srcObject === stream) inactiveVideo.srcObject = null;
+    if (activeVideo) {
+      if (activeVideo.srcObject !== stream) activeVideo.srcObject = stream;
+      activeVideo.play().catch(() => {});
     }
   }, [cameraReady, activeTab, roomStatus]);
 
@@ -317,21 +322,29 @@ function App() {
   };
 
   const prepareRoomCamera = async () => {
-    stopCamera();
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true },
-      video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
-    });
-    stream.getAudioTracks().forEach(track=>track.enabled=micEnabled);
-    stream.getVideoTracks().forEach(track=>track.enabled=videoEnabled);
+    let stream = streamRef.current;
+    const liveVideoTrack = stream?.getVideoTracks().find(track => track.readyState === 'live');
+    if (!liveVideoTrack) {
+      await startCamera(facing, cameraQuality);
+      stream = streamRef.current;
+    }
+    if (!stream) throw new Error('The camera could not be started. Please allow camera access and try again.');
+    const liveAudioTrack = stream.getAudioTracks().find(track => track.readyState === 'live');
+    if (!liveAudioTrack) {
+      const audioOnlyStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+        video: false
+      });
+      const audioTrack = audioOnlyStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = micEnabled;
+        stream.addTrack(audioTrack);
+      }
+    }
+    stream.getAudioTracks().forEach(track => { track.enabled = micEnabled; });
+    stream.getVideoTracks().forEach(track => { track.enabled = videoEnabled; });
     streamRef.current = stream;
-    if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
     setCameraReady(true);
-    navigator.mediaDevices?.enumerateDevices?.().then(list=>setDevices({
-      audioinput:list.filter(d=>d.kind==='audioinput'),
-      videoinput:list.filter(d=>d.kind==='videoinput'),
-      audiooutput:list.filter(d=>d.kind==='audiooutput')
-    })).catch(()=>{});
     return stream;
   };
 
@@ -751,6 +764,16 @@ function App() {
           {gallery.length===0 ? <p className="gallery-empty">Your roll is empty. Go make a moment.</p> : <><div className="gallery-actions"><button onClick={downloadAllPhotos}>DOWNLOAD ALL ({gallery.length})</button><button onClick={clearGallery}>DELETE ALL</button></div><div className="gallery-grid">{gallery.map(item=><div className="gallery-item" key={item.id}><img src={item.data} alt="Saved camera roll photo"/><div><span>{item.filter}</span><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>↓</button><button onClick={()=>deleteGalleryItem(item.id)}>×</button></div></div>)}</div></>}
         </section>}
         </>}
+                      {syncedLocalPhotos.length > 0 && <section className="synced-results" aria-live="polite">
+            <div className="synced-results-head"><div><span className="room-kicker">BOTH CAMERAS · SHARED RESULT</span><h3>{syncedCaptureLabel}</h3></div><span>{syncedRemotePhotos.filter(Boolean).length}/{syncedLocalPhotos.filter(Boolean).length} RECEIVED</span></div>
+            {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
+              <figure><img src={syncedLocalPhotos[0]?.data} alt="Your synchronized photo"/><figcaption>YOU · {syncedLocalPhotos[0]?.filter}</figcaption></figure>
+              <figure>{syncedRemotePhotos[0]?.data ? <img src={syncedRemotePhotos[0].data} alt="Your partner's synchronized photo"/> : <div className="synced-pending">Waiting for the other photo…</div>}<figcaption>YOUR PERSON · {syncedRemotePhotos[0]?.filter || 'RECEIVING'}</figcaption></figure>
+            </div> : <div className="synced-strip">
+              <div className="synced-strip-label">YOU · TOP ROW</div><div className="synced-strip-row">{[0,1,2,3].map(i=><div key={'local'+i}>{syncedLocalPhotos[i]?.data ? <img src={syncedLocalPhotos[i].data} alt={'Your strip photo '+(i+1)}/> : <span className="synced-pending">…</span>}</div>)}</div>
+              <div className="synced-strip-label">YOUR PERSON · BOTTOM ROW</div><div className="synced-strip-row">{[0,1,2,3].map(i=><div key={'remote'+i}>{syncedRemotePhotos[i]?.data ? <img src={syncedRemotePhotos[i].data} alt={'Your partner strip photo '+(i+1)}/> : <span className="synced-pending">…</span>}</div>)}</div>
+            </div>}
+          </section>}
         {activeTab === 'together' && <section className="together-panel">
           <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><span className="mono-label">PRIVATE ROOM</span></div>
           <div className="together-intro"><div><span className="room-kicker">6-CHARACTER ROOM CODE · WEBRTC</span><h2>Two cameras. One little moment.</h2><p>Create a room, share the six-character code, and take pictures together from anywhere.</p></div><span className="room-status"><i className={roomStatus==='connected'?'connected':''}></i>{roomStatus==='connected'?'CONNECTED':roomStatus==='waiting'?'WAITING FOR YOUR PERSON':roomStatus==='joining'?'JOINING…':roomStatus==='starting'?'CREATING ROOM…':roomStatus==='error'?'CHECK CONNECTION':'NOT IN A ROOM'}</span></div>
@@ -769,16 +792,6 @@ function App() {
             {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Your Together filter is independent from the solo camera. Choose a look below; it applies to your preview and your saved synced photo.</p><div className="synced-mode-picker" role="group" aria-label="Synchronized capture mode"><button type="button" className={mode==='single'?'active':''} onClick={()=>setMode('single')} aria-pressed={mode==='single'}>ONE PHOTO</button><button type="button" className={mode==='strip'?'active':''} onClick={()=>setMode('strip')} aria-pressed={mode==='strip'}>4-PHOTO STRIP</button></div><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || syncRunning}>◎ {syncRunning?'CAPTURING BOTH CAMERAS…':'SYNC SHUTTER — BOTH CAMERAS'}</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
 
           </div>}
-                      {syncedLocalPhotos.length > 0 && <section className="synced-results" aria-live="polite">
-            <div className="synced-results-head"><div><span className="room-kicker">BOTH CAMERAS · SHARED RESULT</span><h3>{syncedCaptureLabel}</h3></div><span>{syncedRemotePhotos.filter(Boolean).length}/{syncedLocalPhotos.filter(Boolean).length} RECEIVED</span></div>
-            {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
-              <figure><img src={syncedLocalPhotos[0]?.data} alt="Your synchronized photo"/><figcaption>YOU · {syncedLocalPhotos[0]?.filter}</figcaption></figure>
-              <figure>{syncedRemotePhotos[0]?.data ? <img src={syncedRemotePhotos[0].data} alt="Your partner's synchronized photo"/> : <div className="synced-pending">Waiting for the other photo…</div>}<figcaption>YOUR PERSON · {syncedRemotePhotos[0]?.filter || 'RECEIVING'}</figcaption></figure>
-            </div> : <div className="synced-strip">
-              <div className="synced-strip-label">YOU · TOP ROW</div><div className="synced-strip-row">{[0,1,2,3].map(i=><div key={'local'+i}>{syncedLocalPhotos[i]?.data ? <img src={syncedLocalPhotos[i].data} alt={'Your strip photo '+(i+1)}/> : <span className="synced-pending">…</span>}</div>)}</div>
-              <div className="synced-strip-label">YOUR PERSON · BOTTOM ROW</div><div className="synced-strip-row">{[0,1,2,3].map(i=><div key={'remote'+i}>{syncedRemotePhotos[i]?.data ? <img src={syncedRemotePhotos[i].data} alt={'Your partner strip photo '+(i+1)}/> : <span className="synced-pending">…</span>}</div>)}</div>
-            </div>}
-          </section>}
           <section className="together-filter-panel"><div className="together-filter-head"><div><span className="room-kicker">YOUR TOGETHER LOOK</span><h3>{togetherActiveFilter.name}</h3></div><label>STRENGTH <b>{togetherIntensity}%</b><input type="range" min="0" max="100" value={togetherIntensity} onChange={e=>setTogetherIntensity(Number(e.target.value))}/></label></div><label className="filter-category-label">FILTER COLLECTION<select value={togetherGroup} onChange={e=>setTogetherGroup(e.target.value)}>{GROUPS.map(g=><option key={g} value={g}>{g==='ALL'?'All filters':g.charAt(0)+g.slice(1).toLowerCase()}</option>)}</select></label><div className="together-filter-grid">{togetherVisibleFilters.map((filter,index)=><button key={filter.name} className={cx('filter-tile redesigned-filter-tile',togetherSelected===filter.name&&'chosen')} onClick={()=>setTogetherSelected(filter.name)}><span className="filter-index">{String(index+1).padStart(2,'0')}</span><span className="filter-name">{filter.name}</span><span className="filter-group">{filter.group}</span><span className="filter-select-mark">{togetherSelected===filter.name?'SELECTED':'USE FILTER'}</span></button>)}</div></section>
           {roomError && <div className="room-error">{roomError}</div>}{meetingMessage && <div className="room-success" role="status">{meetingMessage}</div>}
           <div className="room-privacy">⌑ SHARE CODE ONLY WITH YOUR PERSON <span>·</span> HOST APPROVAL REQUIRED <span>·</span> VIDEO IS PEER-TO-PEER</div>
