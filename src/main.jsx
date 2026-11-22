@@ -132,7 +132,7 @@ function App() {
     setCameraReady(false);
   }, []);
 
-  const startCamera = useCallback(async (direction = facing) => {
+  const startCamera = useCallback(async (direction = facing, quality = cameraQuality) => {
     setCameraError('');
     stopCamera();
     if (!navigator.mediaDevices?.getUserMedia) {
@@ -140,7 +140,7 @@ function App() {
       return;
     }
     try {
-      const [qualityWidth, qualityHeight] = cameraQuality === '1080p' ? [1920,1080] : cameraQuality === '480p' ? [854,480] : [1280,720];
+      const [qualityWidth, qualityHeight] = quality === '1080p' ? [1920,1080] : quality === '480p' ? [854,480] : [1280,720];
       const stream = await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:direction},width:{ideal:qualityWidth},height:{ideal:qualityHeight}}});
       streamRef.current = stream;
       if (videoRef.current) {
@@ -354,7 +354,8 @@ function App() {
       setRoomStatus('starting');
       const stream = await prepareRoomCamera();
       const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-      const code = Array.from(crypto.getRandomValues(new Uint8Array(6)), byte => alphabet[byte % alphabet.length]).join('');
+      let code = '';
+      while (code.length < 6) { const bytes = crypto.getRandomValues(new Uint8Array(12)); for (const byte of bytes) { if (byte < 240) code += alphabet[byte % alphabet.length]; if (code.length === 6) break; } }
       const peer = new Peer(code);
       peerRef.current = peer;
       peer.on('open', id => {
@@ -439,6 +440,7 @@ function App() {
   };
 
   const leaveRoom = () => {
+    if (roomStatus !== 'idle' && !window.confirm('Leave this camera room? Your current photos will stay in your camera roll.')) return;
     callRef.current?.close();
     peerRef.current?.destroy();
     peerRef.current = null;
@@ -597,7 +599,7 @@ function App() {
               <span className="meet-controls-note">M MIC · V VIDEO · F FULLSCREEN · SPACE SNAP</span>
             </div>
             <div className="quick-tools"><button onClick={toggleFullscreen}>⛶ Fullscreen</button><button onClick={togglePiP}>▣ Picture-in-picture</button><button onClick={testSpeaker}>♫ Test speaker</button><button onClick={undoLastShot} disabled={!shots.length}>↶ Undo last</button></div>
-            <div className="capture-preferences"><label>CAMERA QUALITY<select value={cameraQuality} onChange={e=>{setCameraQuality(e.target.value);startCamera(facing);}}><option value="480p">480p · Low data</option><option value="720p">720p · Balanced</option><option value="1080p">1080p · High</option></select></label><label>PREVIEW SHAPE<select value={previewRatio} onChange={e=>setPreviewRatio(e.target.value)}><option value="16/9">Widescreen</option><option value="4/3">Classic</option><option value="1/1">Square</option></select></label></div>
+            <div className="capture-preferences"><label>CAMERA QUALITY<select value={cameraQuality} onChange={e=>{setCameraQuality(e.target.value);startCamera(facing,e.target.value);}}><option value="480p">480p · Low data</option><option value="720p">720p · Balanced</option><option value="1080p">1080p · High</option></select></label><label>PREVIEW SHAPE<select value={previewRatio} onChange={e=>setPreviewRatio(e.target.value)}><option value="16/9">Widescreen</option><option value="4/3">Classic</option><option value="1/1">Square</option></select></label></div>
             {cameraError && <div className="camera-error"><span>!</span>{cameraError}<button onClick={() => startCamera(facing)}>TRY AGAIN ↗</button></div>}
             <div className="shoot-controls">
               <div className="control-block">
