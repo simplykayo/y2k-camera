@@ -91,6 +91,7 @@ function App() {
   const dataConnectionsRef = useRef([]);
   const pendingConnectionsRef = useRef([]);
   const approvedPeerRef = useRef('');
+  const isRoomHostRef = useRef(false);
   const [togetherOpen, setTogetherOpen] = useState(false);
   const [roomStatus, setRoomStatus] = useState('idle');
   const [roomCode, setRoomCode] = useState('');
@@ -320,7 +321,7 @@ function App() {
   };
 
   const setupDataConnection = connection => {
-    if (approvedPeerRef.current !== connection.peer) { pendingConnectionsRef.current.push(connection); return; }
+    if (isRoomHostRef.current && approvedPeerRef.current !== connection.peer) { pendingConnectionsRef.current.push(connection); return; }
     dataConnectionsRef.current.push(connection);
     const sendCurrentFilter = () => connection.send({ type: 'Y2K_FILTER', name: selected, intensity });
     if (connection.open) { setDataReady(true); sendCurrentFilter(); }
@@ -348,6 +349,8 @@ function App() {
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
     try {
       setRoomError('');
+      isRoomHostRef.current = true;
+      approvedPeerRef.current = '';
       setRoomStatus('starting');
       const stream = await prepareRoomCamera();
       const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -378,6 +381,8 @@ function App() {
     if (!navigator.mediaDevices?.getUserMedia) { setRoomError('Together Mode needs HTTPS and camera/microphone permissions.'); return; }
     try {
       setRoomError('');
+      isRoomHostRef.current = false;
+      approvedPeerRef.current = '';
       setRoomStatus('joining');
       const stream = await prepareRoomCamera();
       const peer = new Peer();
@@ -442,6 +447,7 @@ function App() {
     pendingConnectionsRef.current.forEach(connection => connection.close());
     pendingConnectionsRef.current = [];
     approvedPeerRef.current = '';
+    isRoomHostRef.current = false;
     setRemoteReady(false);
     setRemoteStream(null);
     setRemoteFilter({ name: 'Original', intensity: 100 });
