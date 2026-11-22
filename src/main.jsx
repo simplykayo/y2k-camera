@@ -96,6 +96,7 @@ function App() {
   const [syncedLocalPhotos, setSyncedLocalPhotos] = useState([]);
   const [syncedRemotePhotos, setSyncedRemotePhotos] = useState([]);
   const [syncedCaptureLabel, setSyncedCaptureLabel] = useState('');
+  const [syncRunning, setSyncRunning] = useState(false);
   const syncBusyRef = useRef(false);
   const syncSessionsRef = useRef(new Set());
   const syncChunksRef = useRef(new Map());
@@ -466,6 +467,7 @@ function App() {
   const runSyncedCapture = async (sessionId, requestedCount = 1) => {
     if (!sessionId || syncSessionsRef.current.has(sessionId)) return;
     syncSessionsRef.current.add(sessionId);
+    setSyncRunning(true);
     const total = Math.max(1, Math.min(4, Number(requestedCount) || 1));
     setSyncedLocalPhotos([]);
     setSyncedRemotePhotos([]);
@@ -483,6 +485,7 @@ function App() {
       if (!data) {
         setRoomError('Camera frame was not ready. Keep both camera previews open and try again.');
         syncSessionsRef.current.delete(sessionId);
+        setSyncRunning(false);
         return;
       }
       setFlash(true);
@@ -507,12 +510,14 @@ function App() {
       setFlash(false);
     }
     setTimer(0);
+    setSyncRunning(false);
     setTimeout(() => syncSessionsRef.current.delete(sessionId), 30000);
   };
 
   const syncShutter = () => {
     if (syncBusyRef.current || !remoteReady || !dataReady) return;
     syncBusyRef.current = true;
+    setSyncRunning(true);
     const sessionId = crypto.randomUUID();
     const count = mode === 'strip' ? 4 : 1;
     setSyncedLocalPhotos([]);
@@ -520,7 +525,7 @@ function App() {
     dataConnectionsRef.current.forEach(connection => {
       if (connection.open) connection.send({ type: 'Y2K_SYNC_SHUTTER', sessionId, count });
     });
-    runSyncedCapture(sessionId, count).finally(() => { syncBusyRef.current = false; });
+    runSyncedCapture(sessionId, count).finally(() => { syncBusyRef.current = false; setSyncRunning(false); });
   };
 
   const handleMainShutter = () => {
@@ -761,7 +766,7 @@ function App() {
               <div className="room-feed"><video ref={localRoomVideoRef} autoPlay muted playsInline style={{filter:filterAtIntensity(togetherActiveFilter.css,togetherIntensity)}}/><span>YOU · CAM 01</span></div>
               <div className="room-feed remote-feed">{remoteReady ? <video ref={remoteVideoRef} autoPlay playsInline style={{filter:filterAtIntensity(remoteActiveFilter.css,remoteFilter.intensity)}}/> : <div className="waiting-feed"><b>♡</b><span>WAITING FOR YOUR PERSON</span><small>Share your 6-character room code</small></div>}<span>YOUR PERSON · CAM 02</span></div>
             </div>
-            {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Your Together filter is independent from the solo camera. Choose a look below; it applies to your preview and your saved synced photo.</p><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || busy}>◎ SYNC SHUTTER — BOTH CAMERAS</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
+            {roomMode==='call' ? <div className="room-call-controls"><span>{remoteReady?'YOU ARE BOTH IN THE ROOM':'Your room is ready when they join.'}</span><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div> : <div className="room-camera-controls"><p>Your Together filter is independent from the solo camera. Choose a look below; it applies to your preview and your saved synced photo.</p><div className="synced-mode-picker" role="group" aria-label="Synchronized capture mode"><button type="button" className={mode==='single'?'active':''} onClick={()=>setMode('single')} aria-pressed={mode==='single'}>ONE PHOTO</button><button type="button" className={mode==='strip'?'active':''} onClick={()=>setMode('strip')} aria-pressed={mode==='strip'}>4-PHOTO STRIP</button></div><button className="primary-button sync-shutter" onClick={syncShutter} disabled={!remoteReady || !dataReady || syncRunning}>◎ {syncRunning?'CAPTURING BOTH CAMERAS…':'SYNC SHUTTER — BOTH CAMERAS'}</button><button className="secondary-room-button" onClick={leaveRoom}>LEAVE ROOM ×</button></div>}
 
           </div>
                       {syncedLocalPhotos.length > 0 && <section className="synced-results" aria-live="polite">
