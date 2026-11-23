@@ -49,8 +49,27 @@ const FILTERS = [
 const GROUPS = ['ALL', 'Y2K', 'FILM', 'COLOR', 'DREAM', 'RETRO', 'ODD', 'MOOD', 'MONO'];
 const ROOM_STORAGE_KEY = 'y2k-camera-room-v1';
 const makeRoomCode = () => { const limit = Math.floor(0x100000000 / 900000) * 900000; const values = new Uint32Array(1); let value; do { crypto.getRandomValues(values); value = values[0]; } while (value >= limit); return String(100000 + (value % 900000)); };
-const THEMES = [['Silver 2004','silver'],['Bubblegum','bubblegum'],['Cyber Lime','cyber-lime'],['Midnight Blue','midnight-blue'],['Cherry Chrome','cherry-chrome'],['Lavender Haze','lavender-haze'],['Sunset Blvd','sunset'],['Mint Condition','mint'],['Violet Arcade','violet'],['Desert Sand','desert'],['Toxic Green','toxic'],['Ocean Drive','ocean'],['Cocoa Club','cocoa'],['Red Alert','red'],['Mono Noir','noir']].map(([name,id])=>({name,id}));
-const STYLES = [{name:'Y2K Camera',id:'y2k',description:'Retro point-and-shoot interface'},{name:'Editorial Magazine',id:'editorial',description:'A photo journal with a magazine layout'},{name:'Darkroom Studio',id:'studio',description:'A pro camera workstation'},{name:'Terminal OS',id:'terminal',description:'A retro computer interface'},{name:'Scrapbook',id:'scrapbook',description:'A tactile memory book'},{name:'Minimal Modern',id:'minimal',description:'A clean, borderless camera app'},{name:'Google Meet',id:'meet',description:'A familiar, clean video meeting layout'}];
+const STYLES = [
+  {name:'Claymorphism',id:'clay',description:'Soft sculpted surfaces and playful depth'},
+  {name:'Minimalism',id:'minimalism',description:'Quiet typography and purposeful space'},
+  {name:'Neo-brutalism',id:'brutal',description:'Bold blocks, hard edges and graphic contrast'},
+  {name:'Cybercore',id:'cyber',description:'Neon interfaces and futuristic control panels'},
+  {name:'Scrapbook',id:'scrapbook',description:'Layered paper, tape and memory-board details'},
+  {name:'Y2K aesthetic',id:'y2k',description:'Glossy chrome, candy colour and digital nostalgia'},
+  {name:'Glasswave',id:'glass',description:'Translucent layers and luminous gradients'},
+  {name:'Pixelart',id:'pixel',description:'Pixel-grid graphics and 8-bit interface details'}
+];
+const THEMES = [
+  {name:'Vanilla Cloud',id:'clay-vanilla',style:'clay'},{name:'Peach Sorbet',id:'clay-peach',style:'clay'},{name:'Matcha Mochi',id:'clay-matcha',style:'clay'},
+  {name:'Paper White',id:'minimal-paper',style:'minimalism'},{name:'Ink & Stone',id:'minimal-ink',style:'minimalism'},{name:'Warm Sand',id:'minimal-sand',style:'minimalism'},
+  {name:'Primary Pop',id:'brutal-primary',style:'brutal'},{name:'Cobalt Punch',id:'brutal-cobalt',style:'brutal'},{name:'Lime Punch',id:'brutal-lime',style:'brutal'},
+  {name:'Neon Tokyo',id:'cyber-tokyo',style:'cyber'},{name:'Acid Circuit',id:'cyber-acid',style:'cyber'},{name:'Violet Protocol',id:'cyber-violet',style:'cyber'},
+  {name:'Sunday Journal',id:'scrap-sunday',style:'scrapbook'},{name:'Love Letters',id:'scrap-love',style:'scrapbook'},{name:'Field Notes',id:'scrap-field',style:'scrapbook'},
+  {name:'Silver 2004',id:'y2k-silver',style:'y2k'},{name:'Bubblegum Chrome',id:'y2k-bubble',style:'y2k'},{name:'Cyber Lime',id:'y2k-lime',style:'y2k'},
+  {name:'Aurora Glass',id:'glass-aurora',style:'glass'},{name:'Ocean Glass',id:'glass-ocean',style:'glass'},{name:'Rose Quartz',id:'glass-rose',style:'glass'},
+  {name:'Arcade Classic',id:'pixel-classic',style:'pixel'},{name:'Berry Bit',id:'pixel-berry',style:'pixel'},{name:'Mint Console',id:'pixel-mint',style:'pixel'}
+];
+const themesForStyle = styleId => THEMES.filter(item => item.style === styleId);
 const cx = (...items) => items.filter(Boolean).join(' ');
 
 function filterAtIntensity(filter, strength) {
@@ -123,8 +142,8 @@ function App() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [remoteFilter, setRemoteFilter] = useState({ name: 'Original', intensity: 100 });
   const [settingsOpen,setSettingsOpen]=useState(false);
-  const [style,setStyle]=useState('y2k');
-  const [theme,setTheme]=useState('silver');
+  const [style,setStyle]=useState('clay');
+  const [theme,setTheme]=useState('clay-vanilla');
   const [devices,setDevices]=useState({audioinput:[],videoinput:[],audiooutput:[]});
   const [micEnabled,setMicEnabled]=useState(true);
   const [videoEnabled,setVideoEnabled]=useState(true);
@@ -1039,7 +1058,7 @@ function App() {
 
       <main>
         
-        {activeTab === 'camera' && <><section className="intro"><div><h1>Y2K Camera</h1><p>A little digital camera for keeping the good bits.</p></div><div className="appearance-bar"><label>STYLE<select value={style} onChange={e=>setStyle(e.target.value)}>{STYLES.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>THEME<select value={theme} onChange={e=>setTheme(e.target.value)}>{THEMES.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label></div></section>
+        {activeTab === 'camera' && <><section className="intro"><div><h1>Y2K Camera</h1><p>A little digital camera for keeping the good bits.</p></div><div className="appearance-bar"><label>STYLE<select value={style} onChange={e=>{setStyle(e.target.value);setTheme(themesForStyle(e.target.value)[0]?.id);}}>{STYLES.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>THEME<select value={theme} onChange={e=>setTheme(e.target.value)}>{themesForStyle(style).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label></div></section>
 
         <div className="studio-grid">
           <section className="camera-column">
@@ -1124,7 +1143,7 @@ function App() {
             <p className="settings-hint">Some browsers only show device names after camera or microphone permission is granted.</p></section>
             <section className="settings-section settings-appearance-section"><span className="settings-kicker">APPEARANCE</span><label className="setting-label">WEBSITE STYLE</label><select value={style} onChange={e=>setStyle(e.target.value)}>{STYLES.map(s=><option key={s.id} value={s.id}>{s.name} — {s.description}</option>)}</select><label className="setting-label">COLOUR THEME</label><select value={theme} onChange={e=>setTheme(e.target.value)}>{THEMES.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select>
             <div className="settings-theme-preview"><span className="theme-preview-chip"></span><div><b>{STYLES.find(s=>s.id===style)?.name}</b><small>{THEMES.find(t=>t.id===theme)?.name} colour theme</small></div></div>
-            <button className="settings-reset" onClick={()=>{setTheme('silver');setStyle('y2k');setMicEnabled(true);setVideoEnabled(true);setAudioInput('');setVideoInput('');setAudioOutput('');}}>RESET SETTINGS</button></section></div>
+            <button className="settings-reset" onClick={()=>{setStyle('clay');setTheme('clay-vanilla');setMicEnabled(true);setVideoEnabled(true);setAudioInput('');setVideoInput('');setAudioOutput('');}}>RESET SETTINGS</button></section></div>
           </section></div>}
                 
         <section className="results-section">
