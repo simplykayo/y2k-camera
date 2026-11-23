@@ -286,3 +286,13 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Glass theme fallback: translucent colour without live backdrop sampling */
+.app-shell[data-style="glass"] .camera-column,
+.app-shell[data-style="glass"] .filter-panel,
+.app-shell[data-style="glass"] .redesigned-filter-tile,
+.app-shell[data-style="glass"] .camera-bottom,
+.app-shell .settings-backdrop {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
