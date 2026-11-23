@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import './styles-overhaul.css';
 import Peer from 'peerjs';
 
 const FILTERS = [
