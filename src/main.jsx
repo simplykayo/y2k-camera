@@ -665,13 +665,14 @@ function App() {
       }
       setTimer(0);
       const localVideo = localRoomVideoRef.current || videoRef.current;
-      const data = renderVideoFrame(localVideo, togetherSelected, togetherIntensity, facing === 'user');
-      if (!data) {
+      const rawData = renderVideoFrame(localVideo, togetherSelected, togetherIntensity, facing === 'user');
+      if (!rawData) {
         setRoomError('Camera frame was not ready. Keep both camera previews open and try again.');
         syncSessionsRef.current.delete(sessionId);
         setSyncRunning(false);
         return;
       }
+      const data = await decoratePhoto(rawData);
       setFlash(true);
       playShutter();
       const localPhoto = { data, filter: togetherSelected };
@@ -900,23 +901,24 @@ function App() {
     });
     try {
       const images = await Promise.all(Array.from({ length: pairs }, (_, i) => Promise.all([load(local[i].data), load(remote[i].data)])));
-      const columns = 2, cellW = 640, cellH = 480, gap = 24, pad = 36, header = 76, footer = 68;
-      const rows = Math.ceil(pairs / columns);
+      const columns = togetherLayout === 'stack' ? 1 : 2, cellW = 640, cellH = 480, gap = 24, pad = 36, header = 76, footer = 68;
+      const allImages = images.flat();
+      const rows = Math.ceil(allImages.length / columns);
       const canvas = document.createElement('canvas');
-      canvas.width = pad * 2 + columns * cellW + gap;
+      canvas.width = pad * 2 + columns * cellW + (columns - 1) * gap;
       canvas.height = pad * 2 + header + rows * cellH + (rows - 1) * gap + footer;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#f4f0e9'; ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#29272b'; ctx.font = 'bold 25px monospace'; ctx.textAlign = 'left';
       ctx.fillText('Y2K CAMERA  /  TOGETHER', pad, pad + 32);
-      images.forEach((pair, i) => pair.forEach((img, side) => {
-        const x = pad + side * (cellW + gap);
+      allImages.forEach((img, i) => {
+        const x = pad + (i % columns) * (cellW + gap);
         const y = pad + header + Math.floor(i / columns) * (cellH + gap);
         ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, cellW, cellH);
         const scale = Math.min((cellW - 20) / img.width, (cellH - 20) / img.height);
         const w = img.width * scale, h = img.height * scale;
         ctx.drawImage(img, x + (cellW - w) / 2, y + (cellH - h) / 2, w, h);
-      }));
+      });
       ctx.fillStyle = '#77717c'; ctx.font = '17px monospace'; ctx.textAlign = 'center';
       ctx.fillText('YOU  +  YOUR PERSON     ·     ' + new Date().toLocaleDateString(), canvas.width / 2, canvas.height - 25);
       await saveImage(canvas.toDataURL('image/jpeg', 0.92), 'y2k-together-combined.jpg');
@@ -1047,7 +1049,7 @@ function App() {
               </button>
               <span className="meet-controls-note">M MIC · V VIDEO · F FULLSCREEN · SPACE SNAP</span>
             </div>
-            <div className="quick-tools"><button onClick={toggleFullscreen}>⛶ Fullscreen</button><button onClick={togglePiP}>▣ Picture-in-picture</button><button onClick={testSpeaker}>♫ Test speaker</button><button onClick={undoLastShot} disabled={!shots.length}>↶ Undo last</button></div>
+            <div className="quick-tools"><button onClick={toggleFullscreen}>⛶ Fullscreen</button><button onClick={togglePiP}>▣ Picture-in-picture</button>{torchAvailable&&<button className={torchEnabled?'active':''} onClick={toggleTorch}>{torchEnabled?'FLASH ON':'FLASH OFF'}</button>}<button onClick={testSpeaker}>♫ Test speaker</button><button onClick={undoLastShot} disabled={!shots.length}>↶ Undo last</button></div>
             <div className="capture-preferences"><label>CAMERA QUALITY<select value={cameraQuality} onChange={e=>{setCameraQuality(e.target.value);startCamera(facing,e.target.value);}}><option value="480p">480p · Low data</option><option value="720p">720p · Balanced</option><option value="1080p">1080p · High</option></select></label><label>PREVIEW SHAPE<select value={previewRatio} onChange={e=>setPreviewRatio(e.target.value)}><option value="16/9">Widescreen</option><option value="4/3">Classic</option><option value="1/1">Square</option></select></label></div>
             {cameraError && <div className="camera-error"><span>!</span>{cameraError}<button onClick={() => startCamera(facing)}>TRY AGAIN ↗</button></div>}
             <div className="shoot-controls">
@@ -1139,7 +1141,7 @@ function App() {
             <div className="synced-results-head"><div><span className="room-kicker">BOTH CAMERAS · SHARED RESULT</span><h3>{syncedCaptureLabel}</h3></div><span>{syncedRemotePhotos.filter(Boolean).length}/{syncedLocalPhotos.filter(Boolean).length} RECEIVED</span></div>
             {syncedLocalPhotos.some(photo => photo?.data) && syncedRemotePhotos.some(photo => photo?.data) && <div className="synced-bulk-actions">
               <button className="synced-save-button" onClick={saveTogetherPhotos}>↓ SAVE BOTH PHOTOS</button>
-              <button className="synced-save-button" onClick={combineTogetherPhotos}>▦ COMBINE INTO ONE</button>
+              <button className="synced-save-button" onClick={combineTogetherPhotos}>▦ COMBINE INTO ONE</button><label className="layout-choice">LAYOUT <select value={togetherLayout} onChange={e=>setTogetherLayout(e.target.value)}><option value="side">Side by side</option><option value="stack">Stacked</option></select></label>
             </div>}
             {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
               <figure><img src={syncedLocalPhotos[0]?.data} alt="Your synchronized photo"/><figcaption>YOU · {syncedLocalPhotos[0]?.filter}</figcaption><button className="synced-save-button" onClick={()=>saveImage(syncedLocalPhotos[0].data,'y2k-together-you.jpg')}>↓ SAVE YOUR PHOTO</button></figure>
