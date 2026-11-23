@@ -1024,7 +1024,7 @@ function App() {
         </a>
         <div className="top-meta"><span className="live-dot"></span> DIGITAL PHOTO STUDIO <span className="meta-divider">/</span> EST. 2004</div>
         <nav className="main-tabs" aria-label="Main sections"><button type="button" className={activeTab==='camera'?'active':''} aria-pressed={activeTab==='camera'} onClick={()=>setActiveTab('camera')}>📷 <span>CAMERA</span></button><button type="button" className={activeTab==='together'?'active':''} aria-pressed={activeTab==='together'} onClick={()=>setActiveTab('together')}>♡ <span>TOGETHER</span>{roomStatus==='connected'&&<i className="tab-live-dot"/>}</button><button type="button" className={activeTab==='studio'?'active':''} aria-pressed={activeTab==='studio'} onClick={()=>setActiveTab('studio')}>▦ <span>STUDIO</span></button></nav>
-        <div className="top-actions"><button className="top-pill" onClick={() => setShowGallery(!showGallery)}>MY ROLL <span className="roll-count">{gallery.length}</span></button><button className="settings-icon-button" onClick={()=>setSettingsOpen(true)} aria-label="Open settings" title="Settings"><span></span><span></span><span></span></button></div>
+        <div className="top-actions"><button className="top-pill" onClick={() => {setShowGallery(false);setActiveTab('studio');}}>MY ROLL <span className="roll-count">{gallery.length}</span></button><button className="settings-icon-button" onClick={()=>setSettingsOpen(true)} aria-label="Open settings" title="Settings"><span></span><span></span><span></span></button></div>
       </header>
 
       <main>
