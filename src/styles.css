@@ -587,3 +587,7 @@ footer b{color:#245b91;margin-left:5px}
  .app-shell .studio-page-heading h1{font-size:32px}
  .app-shell .editor-actions>*{flex:1}
 }
+
+.app-shell .studio-photo-actions{grid-template-columns:repeat(4,minmax(0,1fr))}
+.app-shell .editor-dialog>label select{display:block;width:100%;margin-top:8px;padding:9px;border:1px solid var(--theme-line,#d8d4cc);border-radius:6px;background:var(--theme-panel,#f4f2ed);color:var(--theme-ink,#222)}
+@media(max-width:480px){.app-shell .studio-photo-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
