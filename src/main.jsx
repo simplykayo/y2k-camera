@@ -140,6 +140,7 @@ function App() {
   const [previewRatio,setPreviewRatio]=useState('16/9');
   const [meetingMessage,setMeetingMessage]=useState('');
   const [studioAlbum,setStudioAlbum]=useState('All photos');
+  const [customAlbums,setCustomAlbums]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('y2k-photo-albums')||'null');return Array.isArray(saved)&&saved.length?saved:['Camera','Together','Edited'];}catch{return ['Camera','Together','Edited'];}});
   const [galleryLoaded,setGalleryLoaded]=useState(false);
   const [collageSelection,setCollageSelection]=useState([]);
   const [editorPhoto,setEditorPhoto]=useState(null);
@@ -172,6 +173,8 @@ function App() {
       .catch(() => { if (!cancelled) setGalleryLoaded(true); });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => { try { localStorage.setItem('y2k-photo-albums',JSON.stringify(customAlbums)); } catch {} }, [customAlbums]);
 
   useEffect(() => {
     if (!galleryLoaded || !('indexedDB' in window)) return;
@@ -952,7 +955,10 @@ function App() {
   };
 
   const toggleFavorite = id => setGallery(old => old.map(item => item.id === id ? {...item, favorite: !item.favorite} : item));
-  const assignAlbum = (id, album) => setGallery(old => old.map(item => item.id === id ? {...item, album} : item));
+  const assignAlbum = (id, album) => setGallery(old => old.map(item => item.id === id ? {...item, album:album==='Favorites'?(item.album||'Camera'):album, favorite:album==='Favorites'?true:item.favorite} : item));
+  const createAlbum = () => { const name=window.prompt('Name your new album:'); if(!name||!name.trim())return; const clean=name.trim().slice(0,32); if(customAlbums.some(album=>album.toLowerCase()===clean.toLowerCase())){window.alert('That album already exists.');return;} setCustomAlbums(old=>[...old,clean]); setStudioAlbum(clean); };
+  const renamePhoto = id => { const current=gallery.find(item=>item.id===id); const name=window.prompt('Rename this photo:',current?.title||current?.filter||'Photo'); if(name&&name.trim())setGallery(old=>old.map(item=>item.id===id?{...item,title:name.trim().slice(0,60)}:item)); };
+  const deleteSelectedPhotos = () => { if(!collageSelection.length)return; if(window.confirm('Delete '+collageSelection.length+' selected photos from this device?')){setGallery(old=>old.filter(item=>!collageSelection.includes(item.id)));setCollageSelection([]);} };
   const toggleCollagePhoto = id => setCollageSelection(old => old.includes(id) ? old.filter(value=>value!==id) : old.length < 6 ? [...old,id] : old);
   const makeCollage = async () => {
     const selectedPhotos = gallery.filter(item => collageSelection.includes(item.id)).slice(0,6);
@@ -1115,7 +1121,7 @@ function App() {
             {roomStatus==='connected' && miniCamera && <div className="mini-camera-card"><video ref={miniRemoteVideoRef} autoPlay playsInline muted/><span>YOUR PERSON · LIVE</span><button onClick={()=>setMiniCamera(false)}>HIDE</button></div>}
           </div>
           <div className="studio-toolbar">
-            <label>ALBUM <select value={studioAlbum} onChange={e=>setStudioAlbum(e.target.value)}>{['All photos','Camera','Together','Edited','Favorites'].map(name=><option key={name}>{name}</option>)}</select></label>
+            <label>ALBUM <select value={studioAlbum} onChange={e=>setStudioAlbum(e.target.value)}>{['All photos',...customAlbums,'Favorites'].map(name=><option key={name}>{name}</option>)}</select></label><button onClick={createAlbum}>＋ NEW ALBUM</button><button onClick={deleteSelectedPhotos} disabled={!collageSelection.length}>DELETE SELECTED ({collageSelection.length})</button>
             <label>PHOTO BORDER <select value={photoBorder} onChange={e=>setPhotoBorder(e.target.value)}><option value="none">No border</option><option value="instant">Instant print</option><option value="film">Film frame</option><option value="dark">Dark matte</option></select></label>
             <button onClick={()=>setActiveTab('camera')}>OPEN CAMERA ↗</button>
             {roomStatus==='connected' && <button onClick={()=>setMiniCamera(v=>!v)}>{miniCamera?'HIDE MINI CAMERA':'SHOW MINI CAMERA'}</button>}
@@ -1130,9 +1136,9 @@ function App() {
           <div className="studio-library-grid">{gallery.filter(item=>studioAlbum==='All photos'||(studioAlbum==='Favorites'?item.favorite:item.album===studioAlbum)).map(item=><article className="studio-photo-card" key={item.id}>
             <label className="collage-pick"><input type="checkbox" checked={collageSelection.includes(item.id)} onChange={()=>toggleCollagePhoto(item.id)}/> ADD TO COLLAGE</label>
             <img src={item.data} alt="Saved camera photo"/>
-            <div className="studio-photo-meta"><b>{item.filter||'PHOTO'}</b><span>{item.source||item.album||'CAMERA'}</span></div>
-            <div className="studio-photo-actions"><button onClick={()=>toggleFavorite(item.id)}>{item.favorite?'★ FAVOURITED':'☆ FAVOURITE'}</button><button onClick={()=>setEditorPhoto(item)}>EDIT</button><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>SAVE ↓</button></div>
-            <label className="album-assign">ALBUM <select value={item.album||'Camera'} onChange={e=>assignAlbum(item.id,e.target.value)}><option>Camera</option><option>Together</option><option>Edited</option><option>Favorites</option></select></label>
+            <div className="studio-photo-meta"><b>{item.title||item.filter||'PHOTO'}</b><span>{item.source||item.album||'CAMERA'}</span></div>
+            <div className="studio-photo-actions"><button onClick={()=>toggleFavorite(item.id)}>{item.favorite?'★ FAVOURITED':'☆ FAVOURITE'}</button><button onClick={()=>setEditorPhoto(item)}>EDIT</button><button onClick={()=>renamePhoto(item.id)}>RENAME</button><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>SAVE ↓</button></div>
+            <label className="album-assign">ALBUM <select value={item.album||'Camera'} onChange={e=>assignAlbum(item.id,e.target.value)}>{customAlbums.map(album=><option key={album}>{album}</option>)}<option>Favorites</option></select></label>
             <button className="studio-delete" onClick={()=>deleteGalleryItem(item.id)}>DELETE PHOTO ×</button>
           </article>)}</div>}
           {editorPhoto && <div className="editor-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setEditorPhoto(null);}}><section className="editor-dialog" role="dialog" aria-modal="true" aria-label="Photo editor">
