@@ -937,7 +937,7 @@ function App() {
         ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, cellW, cellH);
         const scale = Math.min((cellW - 20) / img.width, (cellH - 20) / img.height);
         const w = img.width * scale, h = img.height * scale;
-        if (togetherLayout === 'mirror') { ctx.save(); ctx.translate(x + cellW, 0); ctx.scale(-1, 1); ctx.drawImage(img, x + (cellW - w) / 2, y + (cellH - h) / 2, w, h); ctx.restore(); }
+        if (togetherLayout === 'mirror') { ctx.save(); ctx.translate(x + cellW / 2, y + cellH / 2); ctx.scale(-1, 1); ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.restore(); }
         else ctx.drawImage(img, x + (cellW - w) / 2, y + (cellH - h) / 2, w, h);
       });
       ctx.fillStyle = '#77717c'; ctx.font = '17px monospace'; ctx.textAlign = 'center';
