@@ -142,6 +142,7 @@ function App() {
   const [studioAlbum,setStudioAlbum]=useState('All photos');
   const [customAlbums,setCustomAlbums]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('y2k-photo-albums')||'null');return Array.isArray(saved)&&saved.length?saved:['Camera','Together','Edited'];}catch{return ['Camera','Together','Edited'];}});
   const [galleryLoaded,setGalleryLoaded]=useState(false);
+  const galleryPersistedRef=useRef(new Map());
   const [collageSelection,setCollageSelection]=useState([]);
   const [editorPhoto,setEditorPhoto]=useState(null);
   const [editBrightness,setEditBrightness]=useState(100);
@@ -172,7 +173,7 @@ function App() {
       const request = db.transaction('photos', 'readonly').objectStore('photos').getAll();
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
-    })).then(items => { if (!cancelled) { setGallery(current => { const merged = new Map(items.map(item=>[item.id,item])); current.forEach(item=>merged.set(item.id,item)); return [...merged.values()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }); setGalleryLoaded(true); } })
+    })).then(items => { if (!cancelled) { galleryPersistedRef.current=new Map(items.map(item=>[item.id,item])); setGallery(current => { const merged = new Map(items.map(item=>[item.id,item])); current.forEach(item=>merged.set(item.id,item)); return [...merged.values()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }); setGalleryLoaded(true); } })
       .catch(() => { if (!cancelled) setGalleryLoaded(true); });
     return () => { cancelled = true; };
   }, []);
@@ -188,10 +189,13 @@ function App() {
       request.onerror = () => reject(request.error);
     });
     openDb().then(db => {
+      const previous=galleryPersistedRef.current;
+      const current=new Map(gallery.map(photo=>[photo.id,photo]));
       const tx = db.transaction('photos', 'readwrite');
       const store = tx.objectStore('photos');
-      store.clear();
-      gallery.forEach(photo => store.put(photo));
+      previous.forEach((photo,id)=>{if(!current.has(id))store.delete(id);});
+      current.forEach((photo,id)=>{if(previous.get(id)!==photo)store.put(photo);});
+      tx.oncomplete=()=>{galleryPersistedRef.current=current;};
     }).catch(() => {});
   }, [gallery, galleryLoaded]);
 
