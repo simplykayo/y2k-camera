@@ -772,22 +772,58 @@ function App() {
     const local = syncedLocalPhotos.filter(photo => photo?.data);
     const remote = syncedRemotePhotos.filter(photo => photo?.data);
     if (!local.length || !remote.length) return;
-    const files = [...local.map((photo, i) => ({ data: photo.data, name: 'y2k-together-you-' + (i + 1) + '.jpg' })),
-      ...remote.map((photo, i) => ({ data: photo.data, name: 'y2k-together-them-' + (i + 1) + '.jpg' }))];
+    const files = [...local.map((photo, i) => ({ data: photo.data, name: 'you-' + (i + 1) + '.jpg' })),
+      ...remote.map((photo, i) => ({ data: photo.data, name: 'your-person-' + (i + 1) + '.jpg' }))];
     try {
-      const shareFiles = await Promise.all(files.map(async item => {
-        const blob = await (await fetch(item.data)).blob();
-        return new File([blob], item.name, { type: blob.type || 'image/jpeg' });
-      }));
-      if (navigator.share && navigator.canShare?.({ files: shareFiles })) {
-        await navigator.share({ files: shareFiles, title: 'Our Y2K Camera photos' });
+      const entries = await Promise.all(files.map(async item => ({
+        name: new TextEncoder().encode(item.name),
+        bytes: new Uint8Array(await (await fetch(item.data)).arrayBuffer())
+      })));
+      const crc32 = bytes => {
+        let crc = 0xffffffff;
+        for (const byte of bytes) {
+          crc ^= byte;
+          for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      };
+      const localParts = [], centralParts = [];
+      let offset = 0;
+      entries.forEach(entry => {
+        const crc = crc32(entry.bytes), size = entry.bytes.length;
+        const local = new Uint8Array(30 + entry.name.length);
+        const lv = new DataView(local.buffer);
+        lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true);
+        lv.setUint32(14, crc, true); lv.setUint32(18, size, true); lv.setUint32(22, size, true);
+        lv.setUint16(26, entry.name.length, true); local.set(entry.name, 30);
+        localParts.push(local, entry.bytes);
+        const central = new Uint8Array(46 + entry.name.length);
+        const cv = new DataView(central.buffer);
+        cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+        cv.setUint32(16, crc, true); cv.setUint32(20, size, true); cv.setUint32(24, size, true);
+        cv.setUint16(28, entry.name.length, true); cv.setUint32(42, offset, true);
+        central.set(entry.name, 46); centralParts.push(central);
+        offset += local.length + size;
+      });
+      const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+      const end = new Uint8Array(22), ev = new DataView(end.buffer);
+      ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, entries.length, true);
+      ev.setUint16(10, entries.length, true); ev.setUint32(12, centralSize, true);
+      ev.setUint32(16, offset, true);
+      const blob = new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
+      const file = new File([blob], 'y2k-together-photos.zip', { type: 'application/zip' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Our Y2K Camera photos' });
         return;
       }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.href = url; link.download = file.name;
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (error) {
       if (error?.name === 'AbortError') return;
+      window.alert('Could not package the photos. Please try again once both cameras have finished sending.');
     }
-    // Browsers without multi-file sharing download each original photo.
-    for (const item of files) await saveImage(item.data, item.name);
   };
 
   const combineTogetherPhotos = async () => {
