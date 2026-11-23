@@ -68,7 +68,15 @@ const THEMES = [
   {name:'Sunday Journal',id:'scrap-sunday',style:'scrapbook'},{name:'Love Letters',id:'scrap-love',style:'scrapbook'},{name:'Field Notes',id:'scrap-field',style:'scrapbook'},
   {name:'Silver 2004',id:'y2k-silver',style:'y2k'},{name:'Bubblegum Chrome',id:'y2k-bubble',style:'y2k'},{name:'Cyber Lime',id:'y2k-lime',style:'y2k'},
   {name:'Aurora Glass',id:'glass-aurora',style:'glass'},{name:'Ocean Glass',id:'glass-ocean',style:'glass'},{name:'Rose Quartz',id:'glass-rose',style:'glass'},
-  {name:'Arcade Classic',id:'pixel-classic',style:'pixel'},{name:'Berry Bit',id:'pixel-berry',style:'pixel'},{name:'Mint Console',id:'pixel-mint',style:'pixel'}
+  {name:'Arcade Classic',id:'pixel-classic',style:'pixel'},{name:'Berry Bit',id:'pixel-berry',style:'pixel'},{name:'Mint Console',id:'pixel-mint',style:'pixel'},
+  {name:'Cherry Cloud',id:'clay-cherry',style:'clay'},
+  {name:'Cherry Ink',id:'minimal-cherry',style:'minimalism'},
+  {name:'Cherry Pop',id:'brutal-cherry',style:'brutal'},
+  {name:'Cherry.exe',id:'cyber-cherry',style:'cyber'},
+  {name:'Cherry Journal',id:'scrap-cherry',style:'scrapbook'},
+  {name:'Cherry Chrome',id:'y2k-cherry',style:'y2k'},
+  {name:'Cherry Glass',id:'glass-cherry',style:'glass'},
+  {name:'Cherry Pixel',id:'pixel-cherry',style:'pixel'}
 ];
 const themesForStyle = styleId => THEMES.filter(item => item.style === styleId);
 const cx = (...items) => items.filter(Boolean).join(' ');
@@ -172,7 +180,7 @@ function App() {
   const [editRotation,setEditRotation]=useState(0);
   const [editCrop,setEditCrop]=useState('original');
   const [photoBorder,setPhotoBorder]=useState('none');
-  const [togetherLayout,setTogetherLayout]=useState('side');
+  const [togetherLayout,setTogetherLayout]=useState('mirror');
   const [miniCamera,setMiniCamera]=useState(true);
   const [roomReactions,setRoomReactions]=useState([]);
   const miniRemoteVideoRef=useRef(null);
@@ -941,38 +949,87 @@ function App() {
   const combineTogetherPhotos = async () => {
     const local = syncedLocalPhotos.filter(photo => photo?.data);
     const remote = syncedRemotePhotos.filter(photo => photo?.data);
-    if (!local.length || !remote.length) return;
     const pairs = Math.min(local.length, remote.length);
+    if (!pairs) {
+      window.alert('Wait until both cameras have sent at least one photo before combining.');
+      return;
+    }
     const load = data => new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = reject;
+      img.onerror = () => reject(new Error('Could not load a photo'));
       img.src = data;
     });
     try {
-      const images = await Promise.all(Array.from({ length: pairs }, (_, i) => Promise.all([load(local[i].data), load(remote[i].data)])));
-      const columns = togetherLayout === 'stack' ? 1 : 2, cellW = 640, cellH = 480, gap = 24, pad = 36, header = 76, footer = 68;
-      const allImages = images.flat();
-      const rows = Math.ceil(allImages.length / columns);
+      const images = await Promise.all(Array.from({ length: pairs }, (_, i) =>
+        Promise.all([load(local[i].data), load(remote[i].data)])
+      ));
+      // Each capture remains a pair: YOU + YOUR PERSON. In heart mode only
+      // the right-hand portrait is flipped, so the two people face inward.
+      const pairCount = images.length;
+      const columns = togetherLayout === 'stack' ? 1 : 2;
+      const cellW = togetherLayout === 'stack' ? 720 : 560;
+      const cellH = togetherLayout === 'stack' ? 430 : 440;
+      const gap = 24, pad = 36, header = 88, footer = 72;
+      const pairRows = Math.ceil(pairCount / columns);
+      const rowCount = togetherLayout === 'stack' ? pairCount * 2 : pairRows;
       const canvas = document.createElement('canvas');
       canvas.width = pad * 2 + columns * cellW + (columns - 1) * gap;
-      canvas.height = pad * 2 + header + rows * cellH + (rows - 1) * gap + footer;
+      canvas.height = pad * 2 + header + rowCount * cellH + (rowCount - 1) * gap + footer;
       const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#f4f0e9'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#29272b'; ctx.font = 'bold 25px monospace'; ctx.textAlign = 'left';
+      if (!ctx) throw new Error('Canvas is unavailable');
+      ctx.fillStyle = '#f7edf0';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#542d3a';
+      ctx.font = 'bold 26px monospace';
+      ctx.textAlign = 'left';
       ctx.fillText('Y2K CAMERA  /  TOGETHER', pad, pad + 32);
-      allImages.forEach((img, i) => {
-        const x = pad + (i % columns) * (cellW + gap);
-        const y = pad + header + Math.floor(i / columns) * (cellH + gap);
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, cellW, cellH);
-        const scale = Math.min((cellW - 20) / img.width, (cellH - 20) / img.height);
-        const w = img.width * scale, h = img.height * scale;
-        if (togetherLayout === 'mirror') { ctx.save(); ctx.translate(x + cellW / 2, y + cellH / 2); ctx.scale(-1, 1); ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.restore(); }
-        else ctx.drawImage(img, x + (cellW - w) / 2, y + (cellH - h) / 2, w, h);
+      ctx.font = '15px monospace';
+      ctx.fillStyle = '#9a6174';
+      ctx.fillText(togetherLayout === 'mirror' ? 'MIRRORED HEART PAIR' : togetherLayout === 'stack' ? 'STACKED PAIRS' : 'SIDE-BY-SIDE PAIRS', pad, pad + 58);
+
+      const drawPortrait = (img, x, y, w, h, flip = false, label = '') => {
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(x, y, w, h);
+        ctx.beginPath();
+        ctx.rect(x + 10, y + 10, w - 20, h - 20);
+        ctx.clip();
+        const scale = Math.min((w - 28) / img.width, (h - 48) / img.height);
+        const dw = img.width * scale, dh = img.height * scale;
+        const dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+        if (flip) {
+          ctx.translate(x + w / 2, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(img, (x + (w - dw) / 2) - (x + w / 2), dy, dw, dh);
+        } else {
+          ctx.drawImage(img, dx, dy, dw, dh);
+        }
+        ctx.restore();
+        ctx.fillStyle = '#7f5261';
+        ctx.font = 'bold 13px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(label, x + 14, y + h - 13);
+      };
+
+      images.forEach(([you, them], index) => {
+        if (togetherLayout === 'stack') {
+          const x = pad;
+          const firstY = pad + header + index * 2 * (cellH + gap);
+          drawPortrait(you, x, firstY, cellW, cellH, false, 'YOU');
+          drawPortrait(them, x, firstY + cellH + gap, cellW, cellH, false, 'YOUR PERSON');
+        } else {
+          const x = pad + (index % columns) * (cellW + gap);
+          const y = pad + header + Math.floor(index / columns) * (cellH + gap);
+          drawPortrait(you, x, y, cellW, cellH, false, 'YOU');
+          drawPortrait(them, x + cellW, y, cellW, cellH, togetherLayout === 'mirror', 'YOUR PERSON');
+        }
       });
-      ctx.fillStyle = '#77717c'; ctx.font = '17px monospace'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#9a6174';
+      ctx.font = '15px monospace';
+      ctx.textAlign = 'center';
       ctx.fillText('YOU  +  YOUR PERSON     ·     ' + new Date().toLocaleDateString(), canvas.width / 2, canvas.height - 25);
-      await saveImage(canvas.toDataURL('image/jpeg', 0.92), 'y2k-together-combined.jpg');
+      await saveImage(canvas.toDataURL('image/jpeg', 0.94), 'y2k-together-heart-pair.jpg');
     } catch {
       window.alert('Could not combine these photos. Please wait until both cameras have finished sending their pictures, then try again.');
     }
@@ -1198,7 +1255,7 @@ function App() {
             <div className="synced-results-head"><div><span className="room-kicker">BOTH CAMERAS · SHARED RESULT</span><h3>{syncedCaptureLabel}</h3></div><span>{syncedRemotePhotos.filter(Boolean).length}/{syncedLocalPhotos.filter(Boolean).length} RECEIVED</span></div>
             {syncedLocalPhotos.some(photo => photo?.data) && syncedRemotePhotos.some(photo => photo?.data) && <div className="synced-bulk-actions">
               <button className="synced-save-button" onClick={saveTogetherPhotos}>↓ SAVE BOTH PHOTOS</button>
-              <button className="synced-save-button" onClick={combineTogetherPhotos}>▦ COMBINE INTO ONE</button><label className="layout-choice">LAYOUT <select value={togetherLayout} onChange={e=>setTogetherLayout(e.target.value)}><option value="side">Side by side</option><option value="stack">Stacked</option><option value="mirror">Mirrored pair</option></select></label>
+              <button className="synced-save-button" onClick={combineTogetherPhotos}>▦ COMBINE INTO ONE</button><label className="layout-choice">LAYOUT <select value={togetherLayout} onChange={e=>setTogetherLayout(e.target.value)}><option value="mirror">Heart pair · mirror one</option><option value="side">Side by side</option><option value="stack">Stacked together</option></select></label>
             </div>}
             {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
               <figure><img src={syncedLocalPhotos[0]?.data} alt="Your synchronized photo"/><figcaption>YOU · {syncedLocalPhotos[0]?.filter}</figcaption><button className="synced-save-button" onClick={()=>saveImage(syncedLocalPhotos[0].data,'y2k-together-you.jpg')}>↓ SAVE YOUR PHOTO</button></figure>
