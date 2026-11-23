@@ -518,3 +518,72 @@ footer b{color:#245b91;margin-left:5px}
 .app-shell[data-style="meet"] .together-timer-control{background:#fff;border:1px solid #e3e6e8;border-radius:12px}
 .app-shell[data-style="meet"] .together-timer-control>span,.app-shell[data-style="meet"] .together-timer-control>label{font-family:Arial,sans-serif}
 @media(max-width:560px){.app-shell .together-timer-control{justify-content:flex-start;gap:10px}.app-shell .together-timer-control>label{width:100%;padding-top:5px}}
+
+
+/* FINAL PHOTO STUDIO WORKSPACE */
+.app-shell .studio-page{max-width:1240px;margin:26px auto 60px;padding:0 22px}
+.app-shell .studio-page-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:22px;padding:24px 0 20px;border-bottom:1px solid var(--theme-line,#d8d4cc)}
+.app-shell .studio-page-heading h1{margin:6px 0;font-size:clamp(30px,5vw,46px);letter-spacing:-1.8px}
+.app-shell .studio-page-heading p{margin:0;color:var(--theme-muted,#777);font-size:13px}
+.app-shell .studio-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:16px 0;border-bottom:1px solid var(--theme-line,#d8d4cc)}
+.app-shell .studio-toolbar label,.app-shell .camera-extra-controls label{display:flex;align-items:center;gap:8px;color:var(--theme-muted,#777);font:700 9px "Courier New",monospace;letter-spacing:.7px}
+.app-shell .studio-toolbar select,.app-shell .camera-extra-controls select,.app-shell .layout-choice select{padding:9px 11px;border:1px solid var(--theme-line,#d8d4cc);border-radius:7px;background:var(--theme-card,#fff);color:var(--theme-ink,#222);font:11px Arial,sans-serif}
+.app-shell .studio-toolbar>button,.app-shell .studio-photo-actions button,.app-shell .studio-delete,.app-shell .editor-head button,.app-shell .editor-actions>button:not(.primary-button){padding:9px 12px;border:1px solid var(--theme-line,#d8d4cc);border-radius:7px;background:var(--theme-card,#fff);color:var(--theme-ink,#333);font:700 9px "Courier New",monospace;cursor:pointer}
+.app-shell .studio-tools-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0 28px}
+.app-shell .studio-tool-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-height:170px;padding:17px;border:1px solid var(--theme-line,#d8d4cc);border-radius:10px;background:var(--theme-card,#fff)}
+.app-shell .studio-tool-card h3{margin:0;font-size:19px}
+.app-shell .studio-tool-card p{flex:1;margin:0;color:var(--theme-muted,#777);font-size:12px;line-height:1.55}
+.app-shell .studio-tool-card button{margin-top:5px}
+.app-shell .studio-library-head{display:flex;align-items:flex-end;justify-content:space-between;gap:15px;margin:20px 0 14px}
+.app-shell .studio-library-head h2{margin:5px 0 0;font-size:25px}
+.app-shell .studio-library-head>span{color:var(--theme-muted,#777);font:700 9px "Courier New",monospace}
+.app-shell .studio-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:13px}
+.app-shell .studio-photo-card{min-width:0;padding:9px;border:1px solid var(--theme-line,#d8d4cc);border-radius:10px;background:var(--theme-card,#fff)}
+.app-shell .studio-photo-card>img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:6px;background:#e8e8e8}
+.app-shell .collage-pick{display:flex;align-items:center;gap:6px;margin:2px 0 8px;color:var(--theme-muted,#777);font:700 8px "Courier New",monospace}
+.app-shell .collage-pick input{accent-color:var(--theme-accent,#555)}
+.app-shell .studio-photo-meta{display:flex;justify-content:space-between;gap:8px;padding:9px 2px 7px;font:9px "Courier New",monospace}
+.app-shell .studio-photo-meta span{color:var(--theme-muted,#777)}
+.app-shell .studio-photo-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.app-shell .studio-photo-actions button{padding:8px 3px;font-size:8px}
+.app-shell .album-assign{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0;color:var(--theme-muted,#777);font:700 8px "Courier New",monospace}
+.app-shell .album-assign select{min-width:0;max-width:65%;padding:6px;border:1px solid var(--theme-line,#d8d4cc);border-radius:5px;background:var(--theme-panel,#f4f2ed);color:var(--theme-ink,#333);font-size:10px}
+.app-shell .studio-delete{width:100%;padding:7px;color:#9c4c4c}
+.app-shell .mini-camera-card{position:relative;width:180px;flex:0 0 180px;padding:7px;border:1px solid var(--theme-line,#d8d4cc);border-radius:9px;background:var(--theme-card,#fff)}
+.app-shell .mini-camera-card video{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:5px;background:#222}
+.app-shell .mini-camera-card span{display:block;margin-top:6px;font:700 8px "Courier New",monospace;color:var(--theme-muted,#777)}
+.app-shell .mini-camera-card button{position:absolute;top:12px;right:12px;padding:5px 7px;border:0;border-radius:4px;background:#111b;color:#fff;font:700 8px "Courier New",monospace}
+.app-shell .editor-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:#10151dcc;overflow:auto}
+.app-shell .editor-dialog{width:min(560px,100%);max-height:94vh;overflow:auto;padding:20px;border:1px solid var(--theme-line,#d8d4cc);border-radius:13px;background:var(--theme-card,#fff);color:var(--theme-ink,#222);box-shadow:0 18px 70px #0005}
+.app-shell .editor-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.app-shell .editor-head h2{margin:4px 0 12px;font-size:25px}
+.app-shell .editor-preview{display:block;max-width:100%;max-height:42vh;margin:0 auto 18px;object-fit:contain;background:#e8e8e8}
+.app-shell .editor-dialog>label{display:block;margin:13px 0;color:var(--theme-muted,#777);font:700 9px "Courier New",monospace}
+.app-shell .editor-dialog>label input{display:block;width:100%;margin-top:8px;accent-color:var(--theme-accent,#777)}
+.app-shell .editor-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px}
+.app-shell .layout-choice{display:flex;align-items:center;gap:7px;padding:6px 9px;border:1px solid var(--line,#d8d4cc);border-radius:7px;color:var(--muted,#777);font:700 9px "Courier New",monospace}
+.app-shell .room-reaction-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0;padding:11px 13px;border:1px solid var(--line,#d8d4cc);border-radius:9px;background:var(--panel,#f4f2ed)}
+.app-shell .room-reaction-bar>span{margin-right:5px;color:var(--muted,#777);font:700 9px "Courier New",monospace;letter-spacing:.6px}
+.app-shell .room-reaction-bar>button{width:34px;height:34px;border:1px solid var(--line,#d8d4cc);border-radius:50%;background:var(--surface,#fff);font-size:17px;cursor:pointer}
+.app-shell .reaction-history{display:flex;gap:5px;margin-left:auto}
+.app-shell .reaction-history span{font-size:19px;animation:reaction-pop .2s ease-out}
+@keyframes reaction-pop{from{transform:scale(.6);opacity:.4}to{transform:scale(1);opacity:1}}
+.app-shell .camera-extra-controls{display:flex;gap:14px;flex-wrap:wrap;margin:12px 0}
+.app-shell .quick-tools button.active{background:var(--accent-soft,#e7e5df);border-color:var(--theme-accent,#777)}
+.app-shell .synced-mode-picker button{white-space:nowrap}
+.app-shell .studio-page button:focus-visible,.app-shell .room-reaction-bar button:focus-visible{outline:2px solid var(--theme-accent,#777);outline-offset:2px}
+@media(max-width:760px){
+ .app-shell .studio-tools-grid{grid-template-columns:1fr}
+ .app-shell .studio-page-heading{flex-direction:column}
+ .app-shell .mini-camera-card{width:min(100%,240px);flex-basis:auto}
+ .app-shell .studio-toolbar{align-items:stretch}
+ .app-shell .studio-toolbar label{justify-content:space-between;flex:1}
+}
+@media(max-width:480px){
+ .app-shell .studio-page{padding:0 12px}
+ .app-shell .studio-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .app-shell .studio-photo-card{padding:6px}
+ .app-shell .studio-photo-actions button{font-size:7px}
+ .app-shell .studio-page-heading h1{font-size:32px}
+ .app-shell .editor-actions>*{flex:1}
+}
