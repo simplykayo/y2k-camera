@@ -232,3 +232,19 @@
  .app-shell[data-style="y2k"] .filter-panel{display:flex!important;flex-direction:column!important}
  .app-shell[data-style="y2k"] .redesigned-filter-grid{display:flex!important;flex-direction:row!important}
 }
+
+
+/* CHERRY COLLECTION — one Cherry palette for every visual style */
+.app-shell[data-theme="clay-cherry"]{--ui-bg:#f6e3e7;--ui-surface:#fff8f8;--ui-panel:#efd0d7;--ui-ink:#59313c;--ui-muted:#946875;--ui-accent:#d94f70;--ui-line:#e4b8c3;--ui-shadow:0 14px 32px #8e3e5526}
+.app-shell[data-theme="minimal-cherry"]{--ui-bg:#faf4f5;--ui-surface:#fff;--ui-panel:#f1e5e8;--ui-ink:#35272b;--ui-muted:#89757b;--ui-accent:#bd3658;--ui-line:#e6d6da;--ui-shadow:0 5px 18px #58303b12}
+.app-shell[data-theme="brutal-cherry"]{--ui-bg:#ffe7eb;--ui-surface:#fff9fa;--ui-panel:#ffb8c6;--ui-ink:#21151a;--ui-muted:#65404a;--ui-accent:#e52f58;--ui-line:#21151a;--ui-shadow:5px 5px 0 #21151a}
+.app-shell[data-theme="cyber-cherry"]{--ui-bg:#190b13;--ui-surface:#2b111e;--ui-panel:#3d1729;--ui-ink:#ffe7ef;--ui-muted:#d28ba5;--ui-accent:#ff477e;--ui-line:#78324e;--ui-shadow:0 0 28px #ff477e35}
+.app-shell[data-theme="scrap-cherry"]{--ui-bg:#f3e4e1;--ui-surface:#fff8f0;--ui-panel:#e9c8c8;--ui-ink:#56343b;--ui-muted:#98777a;--ui-accent:#c74765;--ui-line:#d8b4b4;--ui-shadow:4px 5px 0 #b98e8e55}
+.app-shell[data-theme="y2k-cherry"]{--ui-bg:#fce5f0;--ui-surface:#fff8fc;--ui-panel:#f4bfd8;--ui-ink:#592548;--ui-muted:#a35b83;--ui-accent:#ed3d9b;--ui-line:#e8a8cb;--ui-shadow:0 12px 30px #c43d8b2b}
+.app-shell[data-theme="glass-cherry"]{--ui-bg:#f4dce8;--ui-surface:#ffffffb8;--ui-panel:#e8bfd488;--ui-ink:#563047;--ui-muted:#91647d;--ui-accent:#cf4f8b;--ui-line:#ffffffb0;--ui-shadow:0 14px 36px #9c4d7930}
+.app-shell[data-theme="pixel-cherry"]{--ui-bg:#28121f;--ui-surface:#3a1b2d;--ui-panel:#54263e;--ui-ink:#ffe8f1;--ui-muted:#d99ab5;--ui-accent:#ff77a8;--ui-line:#a64e76;--ui-shadow:5px 5px 0 #120810}
+.app-shell[data-theme$="-cherry"] .brand-mark,.app-shell[data-theme$="-cherry"] .tiny-square{color:var(--ui-accent)!important}
+.app-shell[data-theme$="-cherry"] .primary-button,.app-shell[data-theme$="-cherry"] .shutter{border-color:var(--ui-accent)!important}
+.app-shell .synced-bulk-actions .layout-choice{flex-wrap:wrap}
+.app-shell .synced-bulk-actions .layout-choice select{min-width:190px}
+@media(max-width:520px){.app-shell .synced-bulk-actions .layout-choice{width:100%;justify-content:space-between}.app-shell .synced-bulk-actions .layout-choice select{flex:1;min-width:0}}
