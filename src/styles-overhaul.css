@@ -248,3 +248,17 @@
 .app-shell .synced-bulk-actions .layout-choice{flex-wrap:wrap}
 .app-shell .synced-bulk-actions .layout-choice select{min-width:190px}
 @media(max-width:520px){.app-shell .synced-bulk-actions .layout-choice{width:100%;justify-content:space-between}.app-shell .synced-bulk-actions .layout-choice select{flex:1;min-width:0}}
+
+
+/* LIVE TOGETHER LAYOUT PREVIEW + STUDIO MIRROR CONTROL */
+.app-shell .synced-pair-grid{display:flex!important;flex-direction:column!important;gap:18px!important}
+.app-shell .synced-pair-preview{width:100%;align-items:stretch!important}
+.app-shell .synced-pair-preview figure{flex:1 1 0;min-width:0!important}
+.app-shell .synced-pair-preview img{width:100%!important;aspect-ratio:4/3!important;object-fit:cover!important}
+.app-shell .synced-layout-stack .synced-pair-preview{max-width:720px;margin-inline:auto}
+.app-shell .synced-layout-stack .synced-pair-preview figure{width:100%}
+.app-shell .synced-layout-side .synced-pair-preview,.app-shell .synced-layout-mirror .synced-pair-preview{flex-direction:row!important}
+.app-shell .synced-layout-stack .synced-pair-preview{flex-direction:column!important}
+.app-shell .editor-dialog>label.editor-mirror-control{display:flex!important;align-items:center;gap:10px;margin:16px 0;padding:12px 14px;border:1px solid var(--theme-line,var(--ui-line));border-radius:10px;background:var(--theme-panel,var(--ui-panel));color:var(--theme-ink,var(--ui-ink));cursor:pointer}
+.app-shell .editor-dialog>label.editor-mirror-control input[type="checkbox"]{display:inline-block!important;width:18px!important;height:18px!important;margin:0!important;accent-color:var(--theme-accent,var(--ui-accent))}
+@media(max-width:520px){.app-shell .synced-pair-preview{gap:8px!important}.app-shell .synced-pair-preview figure{padding:5px!important}.app-shell .synced-pair-preview figcaption{font-size:8px!important}}
