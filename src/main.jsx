@@ -268,6 +268,13 @@ function App() {
   }, [cameraReady, activeTab, roomStatus]);
 
   useEffect(() => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    const capabilities = track?.getCapabilities?.();
+    setTorchAvailable(Boolean(capabilities?.torch));
+    if (!capabilities?.torch) setTorchEnabled(false);
+  }, [cameraReady, videoInput]);
+
+  useEffect(() => {
     if (roomStatus !== 'connected' || !remoteReady) {
       setConnectionQuality({ level: 'checking', label: 'CHECKING', detail: 'Waiting for media connection' });
       return;
