@@ -262,3 +262,27 @@
 .app-shell .editor-dialog>label.editor-mirror-control{display:flex!important;align-items:center;gap:10px;margin:16px 0;padding:12px 14px;border:1px solid var(--theme-line,var(--ui-line));border-radius:10px;background:var(--theme-panel,var(--ui-panel));color:var(--theme-ink,var(--ui-ink));cursor:pointer}
 .app-shell .editor-dialog>label.editor-mirror-control input[type="checkbox"]{display:inline-block!important;width:18px!important;height:18px!important;margin:0!important;accent-color:var(--theme-accent,var(--ui-accent))}
 @media(max-width:520px){.app-shell .synced-pair-preview{gap:8px!important}.app-shell .synced-pair-preview figure{padding:5px!important}.app-shell .synced-pair-preview figcaption{font-size:8px!important}}
+
+
+/* PERFORMANCE PASS — keep the visual styles, remove costly paint effects */
+.app-shell [style*="backdrop-filter"],
+.app-shell [class*="glass"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.app-shell .studio-photo-card,
+.app-shell .gallery-item,
+.app-shell .synced-pair-preview {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 340px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *,
+  .app-shell *::before,
+  .app-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
