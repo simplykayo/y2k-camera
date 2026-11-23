@@ -767,6 +767,67 @@ function App() {
     }
   };
 
+
+  const saveTogetherPhotos = async () => {
+    const local = syncedLocalPhotos.filter(photo => photo?.data);
+    const remote = syncedRemotePhotos.filter(photo => photo?.data);
+    if (!local.length || !remote.length) return;
+    const files = [...local.map((photo, i) => ({ data: photo.data, name: 'y2k-together-you-' + (i + 1) + '.jpg' })),
+      ...remote.map((photo, i) => ({ data: photo.data, name: 'y2k-together-them-' + (i + 1) + '.jpg' }))];
+    try {
+      const shareFiles = await Promise.all(files.map(async item => {
+        const blob = await (await fetch(item.data)).blob();
+        return new File([blob], item.name, { type: blob.type || 'image/jpeg' });
+      }));
+      if (navigator.share && navigator.canShare?.({ files: shareFiles })) {
+        await navigator.share({ files: shareFiles, title: 'Our Y2K Camera photos' });
+        return;
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+    }
+    // Browsers without multi-file sharing download each original photo.
+    for (const item of files) await saveImage(item.data, item.name);
+  };
+
+  const combineTogetherPhotos = async () => {
+    const local = syncedLocalPhotos.filter(photo => photo?.data);
+    const remote = syncedRemotePhotos.filter(photo => photo?.data);
+    if (!local.length || !remote.length) return;
+    const pairs = Math.min(local.length, remote.length);
+    const load = data => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = data;
+    });
+    try {
+      const images = await Promise.all(Array.from({ length: pairs }, (_, i) => Promise.all([load(local[i].data), load(remote[i].data)])));
+      const columns = 2, cellW = 640, cellH = 480, gap = 24, pad = 36, header = 76, footer = 68;
+      const rows = Math.ceil(pairs / columns);
+      const canvas = document.createElement('canvas');
+      canvas.width = pad * 2 + columns * cellW + gap;
+      canvas.height = pad * 2 + header + rows * cellH + (rows - 1) * gap + footer;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f4f0e9'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#29272b'; ctx.font = 'bold 25px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('Y2K CAMERA  /  TOGETHER', pad, pad + 32);
+      images.forEach((pair, i) => pair.forEach((img, side) => {
+        const x = pad + side * (cellW + gap);
+        const y = pad + header + Math.floor(i / columns) * (cellH + gap);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, cellW, cellH);
+        const scale = Math.min((cellW - 20) / img.width, (cellH - 20) / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, x + (cellW - w) / 2, y + (cellH - h) / 2, w, h);
+      }));
+      ctx.fillStyle = '#77717c'; ctx.font = '17px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('YOU  +  YOUR PERSON     ·     ' + new Date().toLocaleDateString(), canvas.width / 2, canvas.height - 25);
+      await saveImage(canvas.toDataURL('image/jpeg', 0.92), 'y2k-together-combined.jpg');
+    } catch {
+      window.alert('Could not combine these photos. Please wait until both cameras have finished sending their pictures, then try again.');
+    }
+  };
+
   const switchCamera = async () => {
     const next = facing === 'user' ? 'environment' : 'user';
     setFacing(next);
@@ -892,6 +953,10 @@ function App() {
         </>}
                       {syncedLocalPhotos.length > 0 && <section className="synced-results" aria-live="polite">
             <div className="synced-results-head"><div><span className="room-kicker">BOTH CAMERAS · SHARED RESULT</span><h3>{syncedCaptureLabel}</h3></div><span>{syncedRemotePhotos.filter(Boolean).length}/{syncedLocalPhotos.filter(Boolean).length} RECEIVED</span></div>
+            {syncedLocalPhotos.some(photo => photo?.data) && syncedRemotePhotos.some(photo => photo?.data) && <div className="synced-bulk-actions">
+              <button className="synced-save-button" onClick={saveTogetherPhotos}>↓ SAVE BOTH PHOTOS</button>
+              <button className="synced-save-button" onClick={combineTogetherPhotos}>▦ COMBINE INTO ONE</button>
+            </div>}
             {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
               <figure><img src={syncedLocalPhotos[0]?.data} alt="Your synchronized photo"/><figcaption>YOU · {syncedLocalPhotos[0]?.filter}</figcaption><button className="synced-save-button" onClick={()=>saveImage(syncedLocalPhotos[0].data,'y2k-together-you.jpg')}>↓ SAVE YOUR PHOTO</button></figure>
               <figure>{syncedRemotePhotos[0]?.data ? <img src={syncedRemotePhotos[0].data} alt="Your sister's synchronized photo"/> : <div className="synced-pending">Waiting for the other photo…</div>}<figcaption>YOUR PERSON · {syncedRemotePhotos[0]?.filter || 'RECEIVING'}</figcaption>{syncedRemotePhotos[0]?.data && <button className="synced-save-button" onClick={()=>saveImage(syncedRemotePhotos[0].data,'y2k-together-their-photo.jpg')}>↓ SAVE THEIR PHOTO</button>}</figure>
