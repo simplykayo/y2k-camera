@@ -170,6 +170,7 @@ function App() {
   const [studioAlbum,setStudioAlbum]=useState('All photos');
   const [customAlbums,setCustomAlbums]=useState(()=>{try{const saved=JSON.parse(localStorage.getItem('y2k-photo-albums')||'null');return Array.isArray(saved)&&saved.length?saved:['Camera','Together','Edited'];}catch{return ['Camera','Together','Edited'];}});
   const [galleryLoaded,setGalleryLoaded]=useState(false);
+  const galleryDbRef=useRef(null);
   const galleryPersistedRef=useRef(new Map());
   const [collageSelection,setCollageSelection]=useState([]);
   const [editorPhoto,setEditorPhoto]=useState(null);
@@ -195,7 +196,7 @@ function App() {
     const openDb = () => new Promise((resolve, reject) => {
       const request = indexedDB.open('y2k-camera-library', 1);
       request.onupgradeneeded = () => request.result.createObjectStore('photos', { keyPath: 'id' });
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => { galleryDbRef.current = request.result; resolve(request.result); };
       request.onerror = () => reject(request.error);
     });
     openDb().then(db => new Promise((resolve, reject) => {
@@ -204,20 +205,15 @@ function App() {
       request.onerror = () => reject(request.error);
     })).then(items => { if (!cancelled) { galleryPersistedRef.current=new Map(items.map(item=>[item.id,item])); setGallery(current => { const merged = new Map(items.map(item=>[item.id,item])); current.forEach(item=>merged.set(item.id,item)); return [...merged.values()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }); setGalleryLoaded(true); } })
       .catch(() => { if (!cancelled) setGalleryLoaded(true); });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; galleryDbRef.current?.close(); galleryDbRef.current = null; };
   }, []);
 
   useEffect(() => { try { localStorage.setItem('y2k-photo-albums',JSON.stringify(customAlbums)); } catch {} }, [customAlbums]);
 
   useEffect(() => {
-    if (!galleryLoaded || !('indexedDB' in window)) return;
-    const openDb = () => new Promise((resolve, reject) => {
-      const request = indexedDB.open('y2k-camera-library', 1);
-      request.onupgradeneeded = () => request.result.createObjectStore('photos', { keyPath: 'id' });
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    openDb().then(db => {
+    if (!galleryLoaded || !galleryDbRef.current) return;
+    const db = galleryDbRef.current;
+    {
       const previous=galleryPersistedRef.current;
       const current=new Map(gallery.map(photo=>[photo.id,photo]));
       const tx = db.transaction('photos', 'readwrite');
@@ -225,7 +221,7 @@ function App() {
       previous.forEach((photo,id)=>{if(!current.has(id))store.delete(id);});
       current.forEach((photo,id)=>{if(previous.get(id)!==photo)store.put(photo);});
       tx.oncomplete=()=>{galleryPersistedRef.current=current;};
-    }).catch(() => {});
+    }
   }, [gallery, galleryLoaded]);
 
   useEffect(() => {
@@ -1215,7 +1211,7 @@ function App() {
 
         {showGallery && activeTab === 'camera' && <section className="gallery-section">
           <div className="section-head"><span><i className="tiny-square pink"></i> MY CAMERA ROLL</span><button className="text-button" onClick={() => setShowGallery(false)}>CLOSE ×</button></div>
-          {gallery.length===0 ? <p className="gallery-empty">Your roll is empty. Go make a moment.</p> : <><div className="gallery-actions"><button onClick={downloadAllPhotos}>DOWNLOAD ALL ({gallery.length})</button><button onClick={clearGallery}>DELETE ALL</button></div><div className="gallery-grid">{gallery.map(item=><div className="gallery-item" key={item.id}><img src={item.data} alt="Saved camera roll photo"/><div><span>{item.filter}</span><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>↓</button><button onClick={()=>deleteGalleryItem(item.id)}>×</button></div></div>)}</div></>}
+          {gallery.length===0 ? <p className="gallery-empty">Your roll is empty. Go make a moment.</p> : <><div className="gallery-actions"><button onClick={downloadAllPhotos}>DOWNLOAD ALL ({gallery.length})</button><button onClick={clearGallery}>DELETE ALL</button></div><div className="gallery-grid">{gallery.map(item=><div className="gallery-item" key={item.id}><img src={item.data} alt="Saved camera roll photo" loading="lazy" decoding="async"/><div><span>{item.filter}</span><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>↓</button><button onClick={()=>deleteGalleryItem(item.id)}>×</button></div></div>)}</div></>}
         </section>}
         </>}
         {activeTab === 'studio' && <section className="studio-page">
@@ -1237,7 +1233,7 @@ function App() {
           {!galleryLoaded ? <p className="gallery-empty">Opening your local photo library…</p> : gallery.filter(item=>studioAlbum==='All photos'||(studioAlbum==='Favorites'?item.favorite:item.album===studioAlbum)).length===0 ? <p className="gallery-empty">No photos here yet. Take a few pictures and they'll appear here.</p> :
           <div className="studio-library-grid">{gallery.filter(item=>studioAlbum==='All photos'||(studioAlbum==='Favorites'?item.favorite:item.album===studioAlbum)).map(item=><article className="studio-photo-card" key={item.id}>
             <label className="collage-pick"><input type="checkbox" checked={collageSelection.includes(item.id)} onChange={()=>toggleCollagePhoto(item.id)}/> ADD TO COLLAGE</label>
-            <img src={item.data} alt="Saved camera photo"/>
+            <img src={item.data} alt="Saved camera photo" loading="lazy" decoding="async"/>
             <div className="studio-photo-meta"><b>{item.title||item.filter||'PHOTO'}</b><span>{item.source||item.album||'CAMERA'}</span></div>
             <div className="studio-photo-actions"><button onClick={()=>toggleFavorite(item.id)}>{item.favorite?'★ FAVOURITED':'☆ FAVOURITE'}</button><button onClick={()=>{setEditBrightness(100);setEditContrast(100);setEditSaturation(100);setEditWarmth(0);setEditRotation(0);setEditCrop('original');setEditMirror(false);setEditMirror(false);setEditorPhoto(item);}}>EDIT</button><button onClick={()=>renamePhoto(item.id)}>RENAME</button><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>SAVE ↓</button></div>
             <label className="album-assign">ALBUM <select value={item.album||'Camera'} onChange={e=>assignAlbum(item.id,e.target.value)}>{customAlbums.map(album=><option key={album}>{album}</option>)}</select></label>
@@ -1262,8 +1258,8 @@ function App() {
               {syncedLocalPhotos.map((localPhoto,index)=>{
                 const remotePhoto=syncedRemotePhotos[index];
                 return <div className="synced-pair-preview" key={localPhoto?.id||index} style={{display:'flex',flexDirection:togetherLayout==='stack'?'column':'row',gap:16}}>
-                  <figure><img src={localPhoto?.data} alt={'Your synchronized photo '+(index+1)}/><figcaption>YOU · {localPhoto?.filter||'PHOTO'}{syncedLocalPhotos.length>1?' · '+(index+1):''}</figcaption><button className="synced-save-button" onClick={()=>saveImage(localPhoto.data,'y2k-together-you-'+(index+1)+'.jpg')}>↓ SAVE YOUR PHOTO</button></figure>
-                  <figure>{remotePhoto?.data ? <img src={remotePhoto.data} alt={'Your person synchronized photo '+(index+1)} style={{transform:togetherLayout==='mirror'?'scaleX(-1)':'none'}}/> : <div className="synced-pending">Waiting for the other photo…</div>}<figcaption>YOUR PERSON · {remotePhoto?.filter||'RECEIVING'}{syncedRemotePhotos.length>1?' · '+(index+1):''}</figcaption>{remotePhoto?.data && <button className="synced-save-button" onClick={()=>saveImage(remotePhoto.data,'y2k-together-their-'+(index+1)+'.jpg')}>↓ SAVE THEIR PHOTO</button>}</figure>
+                  <figure><img src={localPhoto?.data} alt={'Your synchronized photo '+(index+1)} loading="lazy" decoding="async"/><figcaption>YOU · {localPhoto?.filter||'PHOTO'}{syncedLocalPhotos.length>1?' · '+(index+1):''}</figcaption><button className="synced-save-button" onClick={()=>saveImage(localPhoto.data,'y2k-together-you-'+(index+1)+'.jpg')}>↓ SAVE YOUR PHOTO</button></figure>
+                  <figure>{remotePhoto?.data ? <img src={remotePhoto.data} alt={'Your person synchronized photo '+(index+1)} loading="lazy" decoding="async" style={{transform:togetherLayout==='mirror'?'scaleX(-1)':'none'}}/> : <div className="synced-pending">Waiting for the other photo…</div>}<figcaption>YOUR PERSON · {remotePhoto?.filter||'RECEIVING'}{syncedRemotePhotos.length>1?' · '+(index+1):''}</figcaption>{remotePhoto?.data && <button className="synced-save-button" onClick={()=>saveImage(remotePhoto.data,'y2k-together-their-'+(index+1)+'.jpg')}>↓ SAVE THEIR PHOTO</button>}</figure>
                 </div>;
               })}
             </div>
