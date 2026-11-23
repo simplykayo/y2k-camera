@@ -158,6 +158,7 @@ function App() {
 
 
   useEffect(() => {
+    if (!window.indexedDB) { setGalleryLoaded(true); return; }
     let cancelled = false;
     const openDb = () => new Promise((resolve, reject) => {
       const request = indexedDB.open('y2k-camera-library', 1);
@@ -499,7 +500,9 @@ function App() {
           if (syncChunksRef.current.size >= 8) return;
           packet = { parts: new Array(message.total), received: 0, filter: FILTERS.some(filter => filter.name === message.filter) ? message.filter : 'Original' };
           syncChunksRef.current.set(key, packet);
+          window.setTimeout(() => { if (syncChunksRef.current.get(key) === packet) syncChunksRef.current.delete(key); }, 20000);
         }
+        if (packet.parts.length !== message.total) return;
         if (packet.parts[message.part] == null) {
           packet.parts[message.part] = message.data;
           packet.received++;
@@ -1067,7 +1070,7 @@ function App() {
               </button>
               <span className="meet-controls-note">M MIC · V VIDEO · F FULLSCREEN · SPACE SNAP</span>
             </div>
-            <div className="quick-tools"><button onClick={toggleFullscreen}>⛶ Fullscreen</button><button onClick={togglePiP}>▣ Picture-in-picture</button>{torchAvailable&&<button className={torchEnabled?'active':''} onClick={toggleTorch}>{torchEnabled?'FLASH ON':'FLASH OFF'}</button>}<button onClick={testSpeaker}>♫ Test speaker</button><button onClick={undoLastShot} disabled={!shots.length}>↶ Undo last</button></div>
+            <div className="quick-tools"><button onClick={toggleFullscreen}>⛶ Fullscreen</button><button onClick={togglePiP}>▣ Picture-in-picture</button>{torchAvailable&&<button className={torchEnabled?'active':''} onClick={toggleTorch}>{torchEnabled?'TORCH ON':'TORCH OFF'}</button>}<button onClick={testSpeaker}>♫ Test speaker</button><button onClick={undoLastShot} disabled={!shots.length}>↶ Undo last</button></div>
             <div className="capture-preferences"><label>CAMERA QUALITY<select value={cameraQuality} onChange={e=>{setCameraQuality(e.target.value);startCamera(facing,e.target.value);}}><option value="480p">480p · Low data</option><option value="720p">720p · Balanced</option><option value="1080p">1080p · High</option></select></label><label>PREVIEW SHAPE<select value={previewRatio} onChange={e=>setPreviewRatio(e.target.value)}><option value="16/9">Widescreen</option><option value="4/3">Classic</option><option value="1/1">Square</option></select></label></div>
             {cameraError && <div className="camera-error"><span>!</span>{cameraError}<button onClick={() => startCamera(facing)}>TRY AGAIN ↗</button></div>}
             <div className="shoot-controls">
