@@ -148,6 +148,7 @@ function App() {
   const [editContrast,setEditContrast]=useState(100);
   const [editSaturation,setEditSaturation]=useState(100);
   const [editRotation,setEditRotation]=useState(0);
+  const [editCrop,setEditCrop]=useState('original');
   const [photoBorder,setPhotoBorder]=useState('none');
   const [togetherLayout,setTogetherLayout]=useState('side');
   const [miniCamera,setMiniCamera]=useState(true);
@@ -983,11 +984,14 @@ function App() {
   const saveEditedPhoto = async () => {
     if (!editorPhoto) return;
     const img=await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=editorPhoto.data;});
+    let sx=0,sy=0,sw=img.width,sh=img.height;
+    const ratio=editCrop==='square'?1:editCrop==='portrait'?3/4:editCrop==='landscape'?4/3:null;
+    if(ratio){if(sw/sh>ratio){const width=sh*ratio;sx=(sw-width)/2;sw=width;}else{const height=sw/ratio;sy=(sh-height)/2;sh=height;}}
     const rotated=Math.abs(editRotation)%180===90, canvas=document.createElement('canvas');
-    canvas.width=rotated?img.height:img.width;canvas.height=rotated?img.width:img.height;
+    canvas.width=Math.max(1,Math.round(rotated?sh:sw));canvas.height=Math.max(1,Math.round(rotated?sw:sh));
     const ctx=canvas.getContext('2d');ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(editRotation*Math.PI/180);
     ctx.filter='brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+')';
-    ctx.drawImage(img,-img.width/2,-img.height/2);
+    ctx.drawImage(img,sx,sy,sw,sh,-sw/2,-sh/2,sw,sh);
     const data=canvas.toDataURL('image/jpeg',.92), item={id:crypto.randomUUID(),data,filter:'EDITED',time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Edited',favorite:false};
     setGallery(old=>[item,...old]);await saveImage(data,'y2k-edited-photo.jpg');setEditorPhoto(null);
   };
@@ -1154,8 +1158,8 @@ function App() {
             <img className="editor-preview" src={editorPhoto.data} alt="Photo being edited" style={{filter:'brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+')',transform:'rotate('+editRotation+'deg)'}}/>
             <label>BRIGHTNESS · {editBrightness}%<input type="range" min="50" max="150" value={editBrightness} onChange={e=>setEditBrightness(Number(e.target.value))}/></label>
             <label>CONTRAST · {editContrast}%<input type="range" min="50" max="150" value={editContrast} onChange={e=>setEditContrast(Number(e.target.value))}/></label>
-            <label>SATURATION · {editSaturation}%<input type="range" min="0" max="180" value={editSaturation} onChange={e=>setEditSaturation(Number(e.target.value))}/></label>
-            <div className="editor-actions"><button onClick={()=>setEditRotation(v=>(v+90)%360)}>ROTATE 90° ↻</button><button onClick={()=>{setEditBrightness(100);setEditContrast(100);setEditSaturation(100);setEditRotation(0);}}>RESET</button><button className="primary-button" onClick={saveEditedPhoto}>SAVE EDITED COPY ↗</button></div>
+            <label>SATURATION · {editSaturation}%<input type="range" min="0" max="180" value={editSaturation} onChange={e=>setEditSaturation(Number(e.target.value))}/></label><label>CROP RATIO<select value={editCrop} onChange={e=>setEditCrop(e.target.value)}><option value="original">Original</option><option value="square">Square · 1:1</option><option value="portrait">Portrait · 3:4</option><option value="landscape">Landscape · 4:3</option></select></label>
+            <div className="editor-actions"><button onClick={()=>setEditRotation(v=>(v+90)%360)}>ROTATE 90° ↻</button><button onClick={()=>{setEditBrightness(100);setEditContrast(100);setEditSaturation(100);setEditRotation(0);setEditCrop('original');}}>RESET</button><button className="primary-button" onClick={saveEditedPhoto}>SAVE EDITED COPY ↗</button></div>
           </section></div>}
         </section>}
                       {syncedLocalPhotos.length > 0 && <section className="synced-results" aria-live="polite">
