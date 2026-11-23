@@ -139,6 +139,61 @@ function App() {
   const [cameraQuality,setCameraQuality]=useState('720p');
   const [previewRatio,setPreviewRatio]=useState('16/9');
   const [meetingMessage,setMeetingMessage]=useState('');
+  const [studioAlbum,setStudioAlbum]=useState('All photos');
+  const [galleryLoaded,setGalleryLoaded]=useState(false);
+  const [collageSelection,setCollageSelection]=useState([]);
+  const [editorPhoto,setEditorPhoto]=useState(null);
+  const [editBrightness,setEditBrightness]=useState(100);
+  const [editContrast,setEditContrast]=useState(100);
+  const [editSaturation,setEditSaturation]=useState(100);
+  const [editRotation,setEditRotation]=useState(0);
+  const [photoBorder,setPhotoBorder]=useState('none');
+  const [togetherLayout,setTogetherLayout]=useState('side');
+  const [miniCamera,setMiniCamera]=useState(true);
+  const [roomReactions,setRoomReactions]=useState([]);
+  const miniRemoteVideoRef=useRef(null);
+  const [torchAvailable,setTorchAvailable]=useState(false);
+  const [torchEnabled,setTorchEnabled]=useState(false);
+
+
+  useEffect(() => {
+    let cancelled = false;
+    const openDb = () => new Promise((resolve, reject) => {
+      const request = indexedDB.open('y2k-camera-library', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('photos', { keyPath: 'id' });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    openDb().then(db => new Promise((resolve, reject) => {
+      const request = db.transaction('photos', 'readonly').objectStore('photos').getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    })).then(items => { if (!cancelled) { setGallery(items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))); setGalleryLoaded(true); } })
+      .catch(() => { if (!cancelled) setGalleryLoaded(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!galleryLoaded || !('indexedDB' in window)) return;
+    const openDb = () => new Promise((resolve, reject) => {
+      const request = indexedDB.open('y2k-camera-library', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('photos', { keyPath: 'id' });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    openDb().then(db => {
+      const tx = db.transaction('photos', 'readwrite');
+      const store = tx.objectStore('photos');
+      store.clear();
+      gallery.forEach(photo => store.put(photo));
+    }).catch(() => {});
+  }, [gallery, galleryLoaded]);
+
+  useEffect(() => {
+    if (activeTab !== 'studio' || !miniCamera || !remoteStream || !miniRemoteVideoRef.current) return;
+    miniRemoteVideoRef.current.srcObject = remoteStream;
+    miniRemoteVideoRef.current.play().catch(() => {});
+  }, [activeTab, miniCamera, remoteStream]);
 
   const activeFilter = useMemo(() => FILTERS.find(f => f.name === selected) || FILTERS[0], [selected]);
   const visibleFilters = useMemo(() => group === 'ALL' ? FILTERS : FILTERS.filter(f => f.group === group), [group]);
@@ -333,7 +388,7 @@ function App() {
   const takeOne = async (filterName = selected, filterStrength = intensity) => {
     const data = renderFrame(filterName, filterStrength);
     if (!data) return null;
-    const item = { id: crypto.randomUUID(), data, filter: filterName, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) };
+    const item = { id: crypto.randomUUID(), data: await decoratePhoto(data), filter: filterName, time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), createdAt: Date.now(), album: 'Camera', favorite: false };
     setShots(old => [...old, item]);
     setGallery(old => [item, ...old]);
     return item;
@@ -342,7 +397,7 @@ function App() {
   const takePhoto = async (filterName = selected, filterStrength = intensity) => {
     if (!cameraReady || busy) return;
     setBusy(true);
-    const total = mode === 'strip' ? 4 : 1;
+    const total = mode === 'strip' || mode === 'booth' ? 4 : 1;
     for (let i = 0; i < total; i++) {
       for (let n = countdown; n > 0; n--) {
         setTimer(n);
@@ -440,9 +495,14 @@ function App() {
           setSyncedRemotePhotos(old => {
             const next = [...old];
             next[message.index] = { data, filter: packet.filter };
+            setGallery(galleryOld=>[{id:crypto.randomUUID(),data,filter:packet.filter,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Together',favorite:false,source:'THEIR CAMERA'},...galleryOld]);
             return next;
           });
         }
+        return;
+      }
+      if (message && typeof message === 'object' && message.type === 'Y2K_REACTION') {
+        if (['❤️','😂','✨','⭐','📸','🫶'].includes(message.emoji)) setRoomReactions(old=>[...old,{emoji:message.emoji,from:'THEM',id:crypto.randomUUID()}].slice(-8));
         return;
       }
       if (message && typeof message === 'object' && message.type === 'Y2K_FILTER') {
@@ -615,6 +675,7 @@ function App() {
       setFlash(true);
       playShutter();
       const localPhoto = { data, filter: togetherSelected };
+      setGallery(galleryOld=>[{id:crypto.randomUUID(),data,filter:togetherSelected,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Together',favorite:false,source:'YOUR CAMERA'},...galleryOld]);
       setSyncedLocalPhotos(old => {
         const next = [...old];
         next[index] = localPhoto;
@@ -643,7 +704,7 @@ function App() {
     syncBusyRef.current = true;
     setSyncRunning(true);
     const sessionId = crypto.randomUUID();
-    const count = mode === 'strip' ? 4 : 1;
+    const count = mode === 'strip' || mode === 'booth' ? 4 : 1;
     setSyncedLocalPhotos([]);
     setSyncedRemotePhotos([]);
     dataConnectionsRef.current.forEach(connection => {
@@ -862,6 +923,59 @@ function App() {
     } catch {
       window.alert('Could not combine these photos. Please wait until both cameras have finished sending their pictures, then try again.');
     }
+  };
+
+
+  const decoratePhoto = async data => {
+    if (photoBorder === 'none') return data;
+    const img = await new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = reject; image.src = data; });
+    const pad = photoBorder === 'instant' ? 34 : photoBorder === 'film' ? 22 : 10;
+    const footer = photoBorder === 'instant' ? 78 : 22;
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width + pad * 2; canvas.height = img.height + pad * 2 + footer;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = photoBorder === 'dark' ? '#202329' : photoBorder === 'film' ? '#1f2428' : '#fffdf8';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,pad,pad);
+    if (photoBorder === 'instant') { ctx.fillStyle='#777'; ctx.font='16px monospace'; ctx.textAlign='center'; ctx.fillText(new Date().toLocaleDateString(),canvas.width/2,canvas.height-27); }
+    if (photoBorder === 'film') { ctx.fillStyle='#f2e9d9'; ctx.font='12px monospace'; ctx.textAlign='center'; ctx.fillText('Y2K CAMERA  •  '+new Date().toLocaleDateString(),canvas.width/2,canvas.height-7); }
+    return canvas.toDataURL('image/jpeg',.9);
+  };
+
+  const toggleFavorite = id => setGallery(old => old.map(item => item.id === id ? {...item, favorite: !item.favorite} : item));
+  const assignAlbum = (id, album) => setGallery(old => old.map(item => item.id === id ? {...item, album} : item));
+  const toggleCollagePhoto = id => setCollageSelection(old => old.includes(id) ? old.filter(value=>value!==id) : old.length < 6 ? [...old,id] : old);
+  const makeCollage = async () => {
+    const selectedPhotos = gallery.filter(item => collageSelection.includes(item.id)).slice(0,6);
+    if (selectedPhotos.length < 2) { window.alert('Choose at least two photos for a collage.'); return; }
+    const images = await Promise.all(selectedPhotos.map(item => new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=item.data;})));
+    const cols = selectedPhotos.length === 2 ? 2 : selectedPhotos.length <= 4 ? 2 : 3;
+    const rows = Math.ceil(images.length/cols), cellW=420, cellH=420, gap=16, pad=28;
+    const canvas=document.createElement('canvas');canvas.width=pad*2+cols*cellW+(cols-1)*gap;canvas.height=pad*2+rows*cellH+(rows-1)*gap+52;
+    const ctx=canvas.getContext('2d');ctx.fillStyle='#f4f0e9';ctx.fillRect(0,0,canvas.width,canvas.height);
+    images.forEach((img,i)=>{const x=pad+(i%cols)*(cellW+gap),y=pad+Math.floor(i/cols)*(cellH+gap);ctx.fillStyle='#fff';ctx.fillRect(x,y,cellW,cellH);const scale=Math.max(cellW/img.width,cellH/img.height);const w=img.width*scale,h=img.height*scale;ctx.save();ctx.beginPath();ctx.rect(x,y,cellW,cellH);ctx.clip();ctx.drawImage(img,x+(cellW-w)/2,y+(cellH-h)/2,w,h);ctx.restore();});
+    ctx.fillStyle='#777';ctx.font='16px monospace';ctx.textAlign='center';ctx.fillText('Y2K CAMERA  /  LITTLE MOMENTS',canvas.width/2,canvas.height-17);
+    await saveImage(canvas.toDataURL('image/jpeg',.92),'y2k-collage.jpg');
+  };
+  const saveEditedPhoto = async () => {
+    if (!editorPhoto) return;
+    const img=await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=editorPhoto.data;});
+    const rotated=Math.abs(editRotation)%180===90, canvas=document.createElement('canvas');
+    canvas.width=rotated?img.height:img.width;canvas.height=rotated?img.width:img.height;
+    const ctx=canvas.getContext('2d');ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(editRotation*Math.PI/180);
+    ctx.filter='brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+')';
+    ctx.drawImage(img,-img.width/2,-img.height/2);
+    const data=canvas.toDataURL('image/jpeg',.92), item={id:crypto.randomUUID(),data,filter:'EDITED',time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Edited',favorite:false};
+    setGallery(old=>[item,...old]);await saveImage(data,'y2k-edited-photo.jpg');setEditorPhoto(null);
+  };
+  const sendReaction = emoji => {
+    setRoomReactions(old=>[...old,{emoji,from:'YOU',id:crypto.randomUUID()}].slice(-8));
+    dataConnectionsRef.current.forEach(connection=>{if(connection.open)connection.send({type:'Y2K_REACTION',emoji});});
+  };
+  const toggleTorch = async () => {
+    const track=streamRef.current?.getVideoTracks()[0];
+    try { await track?.applyConstraints({advanced:[{torch:!torchEnabled}]});setTorchEnabled(!torchEnabled); }
+    catch { setRoomError('Flash/torch is not supported by this camera or browser.'); }
   };
 
   const switchCamera = async () => {
