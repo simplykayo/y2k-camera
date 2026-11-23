@@ -447,6 +447,7 @@ footer b{color:#245b91;margin-left:5px}
 .app-shell>.topbar>.main-tabs button.active{background:#fff;color:#1967d2;box-shadow:0 1px 4px #20212420}
 .app-shell>.topbar>.top-actions{grid-column:3;grid-row:1}
 .app-shell .synced-results{margin:24px 0;padding:18px;background:var(--panel,#f4f2ed);border:1px solid var(--line,#d8d4cc);border-radius:14px}
+.app-shell .synced-bulk-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:0 0 14px}.app-shell .synced-bulk-actions .synced-save-button{margin-top:0;min-height:42px}@media(max-width:560px){.app-shell .synced-bulk-actions{grid-template-columns:1fr}.app-shell .synced-results-head{align-items:flex-start}}
 .app-shell .synced-results-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:14px}
 .app-shell .synced-results-head h3{margin:5px 0 0;font-size:20px}
 .app-shell .synced-results-head>span{font:10px "Courier New",monospace;color:var(--muted,#777)}
