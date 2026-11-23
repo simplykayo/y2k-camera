@@ -680,47 +680,53 @@ function App() {
     setSyncedLocalPhotos([]);
     setSyncedRemotePhotos([]);
     setSyncedCaptureLabel(total === 4 ? 'FOUR-POSE CONNECTED PHOTO STRIP' : 'SYNCHRONIZED PHOTO PAIR');
-    for (let index = 0; index < total; index++) {
-      if (index > 0) await new Promise(resolve => setTimeout(resolve, 650));
-      setTimer(requestedCountdown);
-      for (let n = requestedCountdown; n > 0; n--) {
-        setTimer(n);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      setTimer(0);
-      const localVideo = localRoomVideoRef.current || videoRef.current;
-      const rawData = renderVideoFrame(localVideo, togetherSelected, togetherIntensity, facing === 'user');
-      if (!rawData) {
-        setRoomError('Camera frame was not ready. Keep both camera previews open and try again.');
-        syncSessionsRef.current.delete(sessionId);
-        setSyncRunning(false);
-        return;
-      }
-      const data = await decoratePhoto(rawData);
-      setFlash(true);
-      playShutter();
-      const localPhoto = { data, filter: togetherSelected };
-      setGallery(galleryOld=>[{id:crypto.randomUUID(),data,filter:togetherSelected,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Together',favorite:false,source:'YOUR CAMERA'},...galleryOld]);
-      setSyncedLocalPhotos(old => {
-        const next = [...old];
-        next[index] = localPhoto;
-        return next;
-      });
-      const chunkSize = 12000;
-      const totalChunks = Math.ceil(data.length / chunkSize);
-      dataConnectionsRef.current.forEach(connection => {
-        if (!connection.open) return;
-        for (let part = 0; part < totalChunks; part++) {
-          connection.send({
-            type: 'Y2K_SYNC_PHOTO_CHUNK', sessionId, index, part, total: totalChunks,
-            filter: togetherSelected, data: data.slice(part * chunkSize, (part + 1) * chunkSize)
-          });
+    try {
+      for (let index = 0; index < total; index++) {
+        if (index > 0) await new Promise(resolve => setTimeout(resolve, 650));
+        setTimer(requestedCountdown);
+        for (let n = requestedCountdown; n > 0; n--) {
+          setTimer(n);
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
-      });
+        setTimer(0);
+        const localVideo = localRoomVideoRef.current || videoRef.current;
+        const rawData = renderVideoFrame(localVideo, togetherSelected, togetherIntensity, facing === 'user');
+        if (!rawData) {
+          setRoomError('Camera frame was not ready. Keep both camera previews open and try again.');
+          syncSessionsRef.current.delete(sessionId);
+          return;
+        }
+        const data = await decoratePhoto(rawData);
+        setFlash(true);
+        playShutter();
+        const localPhoto = { data, filter: togetherSelected };
+        setGallery(galleryOld=>[{id:crypto.randomUUID(),data,filter:togetherSelected,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Together',favorite:false,source:'YOUR CAMERA'},...galleryOld]);
+        setSyncedLocalPhotos(old => {
+          const updated = [...old];
+          updated[index] = localPhoto;
+          return updated;
+        });
+        const chunkSize = 12000;
+        const totalChunks = Math.ceil(data.length / chunkSize);
+        dataConnectionsRef.current.forEach(connection => {
+          if (!connection.open) return;
+          for (let part = 0; part < totalChunks; part++) {
+            connection.send({
+              type: 'Y2K_SYNC_PHOTO_CHUNK', sessionId, index, part, total: totalChunks,
+              filter: togetherSelected, data: data.slice(part * chunkSize, (part + 1) * chunkSize)
+            });
+          }
+        });
+        setFlash(false);
+      }
+    } catch {
+      setRoomError('The synchronized capture was interrupted. Check the connection and try again.');
+      syncSessionsRef.current.delete(sessionId);
+    } finally {
+      setTimer(0);
       setFlash(false);
+      setSyncRunning(false);
     }
-    setTimer(0);
-    setSyncRunning(false);
     setTimeout(() => syncSessionsRef.current.delete(sessionId), 30000);
   };
 
