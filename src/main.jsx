@@ -169,7 +169,7 @@ function App() {
       const request = db.transaction('photos', 'readonly').objectStore('photos').getAll();
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
-    })).then(items => { if (!cancelled) { setGallery(items.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))); setGalleryLoaded(true); } })
+    })).then(items => { if (!cancelled) { setGallery(current => { const merged = new Map(items.map(item=>[item.id,item])); current.forEach(item=>merged.set(item.id,item)); return [...merged.values()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }); setGalleryLoaded(true); } })
       .catch(() => { if (!cancelled) setGalleryLoaded(true); });
     return () => { cancelled = true; };
   }, []);
@@ -1143,7 +1143,7 @@ function App() {
             <img src={item.data} alt="Saved camera photo"/>
             <div className="studio-photo-meta"><b>{item.title||item.filter||'PHOTO'}</b><span>{item.source||item.album||'CAMERA'}</span></div>
             <div className="studio-photo-actions"><button onClick={()=>toggleFavorite(item.id)}>{item.favorite?'★ FAVOURITED':'☆ FAVOURITE'}</button><button onClick={()=>setEditorPhoto(item)}>EDIT</button><button onClick={()=>renamePhoto(item.id)}>RENAME</button><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>SAVE ↓</button></div>
-            <label className="album-assign">ALBUM <select value={item.album||'Camera'} onChange={e=>assignAlbum(item.id,e.target.value)}>{customAlbums.map(album=><option key={album}>{album}</option>)}<option>Favorites</option></select></label>
+            <label className="album-assign">ALBUM <select value={item.album||'Camera'} onChange={e=>assignAlbum(item.id,e.target.value)}>{customAlbums.map(album=><option key={album}>{album}</option>)}</select></label>
             <button className="studio-delete" onClick={()=>deleteGalleryItem(item.id)}>DELETE PHOTO ×</button>
           </article>)}</div>}
           {editorPhoto && <div className="editor-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setEditorPhoto(null);}}><section className="editor-dialog" role="dialog" aria-modal="true" aria-label="Photo editor">
