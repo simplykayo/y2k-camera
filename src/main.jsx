@@ -967,14 +967,13 @@ function App() {
       // Each capture remains a pair: YOU + YOUR PERSON. In heart mode only
       // the right-hand portrait is flipped, so the two people face inward.
       const pairCount = images.length;
-      const columns = togetherLayout === 'stack' ? 1 : 2;
-      const cellW = togetherLayout === 'stack' ? 720 : 560;
-      const cellH = togetherLayout === 'stack' ? 430 : 440;
+      const stacked = togetherLayout === 'stack';
+      const cellW = stacked ? 720 : 560;
+      const cellH = stacked ? 430 : 440;
       const gap = 24, pad = 36, header = 88, footer = 72;
-      const pairRows = Math.ceil(pairCount / columns);
-      const rowCount = togetherLayout === 'stack' ? pairCount * 2 : pairRows;
+      const rowCount = stacked ? pairCount * 2 : pairCount;
       const canvas = document.createElement('canvas');
-      canvas.width = pad * 2 + columns * cellW + (columns - 1) * gap;
+      canvas.width = pad * 2 + (stacked ? cellW : cellW * 2 + gap);
       canvas.height = pad * 2 + header + rowCount * cellH + (rowCount - 1) * gap + footer;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas is unavailable');
@@ -1019,10 +1018,11 @@ function App() {
           drawPortrait(you, x, firstY, cellW, cellH, false, 'YOU');
           drawPortrait(them, x, firstY + cellH + gap, cellW, cellH, false, 'YOUR PERSON');
         } else {
-          const x = pad + (index % columns) * (cellW + gap);
-          const y = pad + header + Math.floor(index / columns) * (cellH + gap);
-          drawPortrait(you, x, y, cellW, cellH, false, 'YOU');
-          drawPortrait(them, x + cellW, y, cellW, cellH, togetherLayout === 'mirror', 'YOUR PERSON');
+          const y = pad + header + index * (cellH + gap);
+          const leftX = pad;
+          const rightX = pad + cellW + gap;
+          drawPortrait(you, leftX, y, cellW, cellH, false, 'YOU');
+          drawPortrait(them, rightX, y, cellW, cellH, togetherLayout === 'mirror', 'YOUR PERSON');
         }
       });
       ctx.fillStyle = '#9a6174';
