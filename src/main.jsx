@@ -147,6 +147,7 @@ function App() {
   const [editBrightness,setEditBrightness]=useState(100);
   const [editContrast,setEditContrast]=useState(100);
   const [editSaturation,setEditSaturation]=useState(100);
+  const [editWarmth,setEditWarmth]=useState(0);
   const [editRotation,setEditRotation]=useState(0);
   const [editCrop,setEditCrop]=useState('original');
   const [photoBorder,setPhotoBorder]=useState('none');
@@ -936,7 +937,8 @@ function App() {
         ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, cellW, cellH);
         const scale = Math.min((cellW - 20) / img.width, (cellH - 20) / img.height);
         const w = img.width * scale, h = img.height * scale;
-        ctx.drawImage(img, x + (cellW - w) / 2, y + (cellH - h) / 2, w, h);
+        if (togetherLayout === 'mirror') { ctx.save(); ctx.translate(x + cellW, 0); ctx.scale(-1, 1); ctx.drawImage(img, x + (cellW - w) / 2, y + (cellH - h) / 2, w, h); ctx.restore(); }
+        else ctx.drawImage(img, x + (cellW - w) / 2, y + (cellH - h) / 2, w, h);
       });
       ctx.fillStyle = '#77717c'; ctx.font = '17px monospace'; ctx.textAlign = 'center';
       ctx.fillText('YOU  +  YOUR PERSON     ·     ' + new Date().toLocaleDateString(), canvas.width / 2, canvas.height - 25);
@@ -990,7 +992,7 @@ function App() {
     const rotated=Math.abs(editRotation)%180===90, canvas=document.createElement('canvas');
     canvas.width=Math.max(1,Math.round(rotated?sh:sw));canvas.height=Math.max(1,Math.round(rotated?sw:sh));
     const ctx=canvas.getContext('2d');ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(editRotation*Math.PI/180);
-    ctx.filter='brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+')';
+    ctx.filter='brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+') sepia('+(editWarmth/100*.35)+')';
     ctx.drawImage(img,sx,sy,sw,sh,-sw/2,-sh/2,sw,sh);
     const data=canvas.toDataURL('image/jpeg',.92), item={id:crypto.randomUUID(),data,filter:'EDITED',time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Edited',favorite:false};
     setGallery(old=>[item,...old]);await saveImage(data,'y2k-edited-photo.jpg');setEditorPhoto(null);
@@ -1155,18 +1157,18 @@ function App() {
           </article>)}</div>}
           {editorPhoto && <div className="editor-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setEditorPhoto(null);}}><section className="editor-dialog" role="dialog" aria-modal="true" aria-label="Photo editor">
             <div className="editor-head"><div><span className="room-kicker">PHOTO LAB</span><h2>Edit photo</h2></div><button onClick={()=>setEditorPhoto(null)}>CLOSE ×</button></div>
-            <img className="editor-preview" src={editorPhoto.data} alt="Photo being edited" style={{filter:'brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+')',transform:'rotate('+editRotation+'deg)'}}/>
+            <img className="editor-preview" src={editorPhoto.data} alt="Photo being edited" style={{filter:'brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+') sepia('+(editWarmth/100*.35)+')',transform:'rotate('+editRotation+'deg)'}}/>
             <label>BRIGHTNESS · {editBrightness}%<input type="range" min="50" max="150" value={editBrightness} onChange={e=>setEditBrightness(Number(e.target.value))}/></label>
             <label>CONTRAST · {editContrast}%<input type="range" min="50" max="150" value={editContrast} onChange={e=>setEditContrast(Number(e.target.value))}/></label>
-            <label>SATURATION · {editSaturation}%<input type="range" min="0" max="180" value={editSaturation} onChange={e=>setEditSaturation(Number(e.target.value))}/></label><label>CROP RATIO<select value={editCrop} onChange={e=>setEditCrop(e.target.value)}><option value="original">Original</option><option value="square">Square · 1:1</option><option value="portrait">Portrait · 3:4</option><option value="landscape">Landscape · 4:3</option></select></label>
-            <div className="editor-actions"><button onClick={()=>setEditRotation(v=>(v+90)%360)}>ROTATE 90° ↻</button><button onClick={()=>{setEditBrightness(100);setEditContrast(100);setEditSaturation(100);setEditRotation(0);setEditCrop('original');}}>RESET</button><button className="primary-button" onClick={saveEditedPhoto}>SAVE EDITED COPY ↗</button></div>
+            <label>SATURATION · {editSaturation}%<input type="range" min="0" max="180" value={editSaturation} onChange={e=>setEditSaturation(Number(e.target.value))}/></label><label>WARMTH · {editWarmth}%<input type="range" min="0" max="100" value={editWarmth} onChange={e=>setEditWarmth(Number(e.target.value))}/></label><label>CROP RATIO<select value={editCrop} onChange={e=>setEditCrop(e.target.value)}><option value="original">Original</option><option value="square">Square · 1:1</option><option value="portrait">Portrait · 3:4</option><option value="landscape">Landscape · 4:3</option></select></label>
+            <div className="editor-actions"><button onClick={()=>setEditRotation(v=>(v+90)%360)}>ROTATE 90° ↻</button><button onClick={()=>{setEditBrightness(100);setEditContrast(100);setEditSaturation(100);setEditWarmth(0);setEditRotation(0);setEditCrop('original');}}>RESET</button><button className="primary-button" onClick={saveEditedPhoto}>SAVE EDITED COPY ↗</button></div>
           </section></div>}
         </section>}
                       {syncedLocalPhotos.length > 0 && <section className="synced-results" aria-live="polite">
             <div className="synced-results-head"><div><span className="room-kicker">BOTH CAMERAS · SHARED RESULT</span><h3>{syncedCaptureLabel}</h3></div><span>{syncedRemotePhotos.filter(Boolean).length}/{syncedLocalPhotos.filter(Boolean).length} RECEIVED</span></div>
             {syncedLocalPhotos.some(photo => photo?.data) && syncedRemotePhotos.some(photo => photo?.data) && <div className="synced-bulk-actions">
               <button className="synced-save-button" onClick={saveTogetherPhotos}>↓ SAVE BOTH PHOTOS</button>
-              <button className="synced-save-button" onClick={combineTogetherPhotos}>▦ COMBINE INTO ONE</button><label className="layout-choice">LAYOUT <select value={togetherLayout} onChange={e=>setTogetherLayout(e.target.value)}><option value="side">Side by side</option><option value="stack">Stacked</option></select></label>
+              <button className="synced-save-button" onClick={combineTogetherPhotos}>▦ COMBINE INTO ONE</button><label className="layout-choice">LAYOUT <select value={togetherLayout} onChange={e=>setTogetherLayout(e.target.value)}><option value="side">Side by side</option><option value="stack">Stacked</option><option value="mirror">Mirrored pair</option></select></label>
             </div>}
             {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
               <figure><img src={syncedLocalPhotos[0]?.data} alt="Your synchronized photo"/><figcaption>YOU · {syncedLocalPhotos[0]?.filter}</figcaption><button className="synced-save-button" onClick={()=>saveImage(syncedLocalPhotos[0].data,'y2k-together-you.jpg')}>↓ SAVE YOUR PHOTO</button></figure>
