@@ -408,20 +408,25 @@ function App() {
     if (!cameraReady || busy) return;
     setBusy(true);
     const total = mode === 'strip' || mode === 'booth' ? 4 : 1;
-    for (let i = 0; i < total; i++) {
-      for (let n = countdown; n > 0; n--) {
-        setTimer(n);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      for (let i = 0; i < total; i++) {
+        for (let n = countdown; n > 0; n--) {
+          setTimer(n);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        setTimer(0);
+        setFlash(true); playShutter();
+        await new Promise(resolve => setTimeout(resolve, 130));
+        await takeOne(filterName, filterStrength);
+        await new Promise(resolve => setTimeout(resolve, 520));
+        setFlash(false);
+        if (i < total - 1) await new Promise(resolve => setTimeout(resolve, 450));
       }
-      setTimer(0);
-      setFlash(true); playShutter();
-      await new Promise(resolve => setTimeout(resolve, 130));
-      await takeOne(filterName, filterStrength);
-      await new Promise(resolve => setTimeout(resolve, 520));
-      setFlash(false);
-      if (i < total - 1) await new Promise(resolve => setTimeout(resolve, 450));
+    } catch {
+      setCameraError('The photo could not be captured. Check camera permission and try again.');
+    } finally {
+      setTimer(0); setFlash(false); setBusy(false);
     }
-    setBusy(false);
   };
   const attachRemoteCall = call => {
     callRef.current = call;
@@ -503,11 +508,11 @@ function App() {
           const data = packet.parts.join('');
           syncChunksRef.current.delete(key);
           setSyncedRemotePhotos(old => {
-            const next = [...old];
-            next[message.index] = { data, filter: packet.filter };
-            setGallery(galleryOld=>[{id:crypto.randomUUID(),data,filter:packet.filter,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Together',favorite:false,source:'THEIR CAMERA'},...galleryOld]);
-            return next;
+            const updated = [...old];
+            updated[message.index] = { data, filter: packet.filter };
+            return updated;
           });
+          setGallery(galleryOld=>[{id:crypto.randomUUID(),data,filter:packet.filter,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Together',favorite:false,source:'THEIR CAMERA'},...galleryOld]);
         }
         return;
       }
