@@ -178,6 +178,7 @@ function App() {
   const [editSaturation,setEditSaturation]=useState(100);
   const [editWarmth,setEditWarmth]=useState(0);
   const [editRotation,setEditRotation]=useState(0);
+  const [editMirror,setEditMirror]=useState(false);
   const [editCrop,setEditCrop]=useState('original');
   const [photoBorder,setPhotoBorder]=useState('none');
   const [togetherLayout,setTogetherLayout]=useState('mirror');
@@ -1078,7 +1079,7 @@ function App() {
     if(ratio){if(sw/sh>ratio){const width=sh*ratio;sx=(sw-width)/2;sw=width;}else{const height=sw/ratio;sy=(sh-height)/2;sh=height;}}
     const rotated=Math.abs(editRotation)%180===90, canvas=document.createElement('canvas');
     canvas.width=Math.max(1,Math.round(rotated?sh:sw));canvas.height=Math.max(1,Math.round(rotated?sw:sh));
-    const ctx=canvas.getContext('2d');ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(editRotation*Math.PI/180);
+    const ctx=canvas.getContext('2d');ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(editRotation*Math.PI/180);if(editMirror)ctx.scale(-1,1);
     ctx.filter='brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+') sepia('+(editWarmth/100*.35)+')';
     ctx.drawImage(img,sx,sy,sw,sh,-sw/2,-sh/2,sw,sh);
     const data=canvas.toDataURL('image/jpeg',.92), item={id:crypto.randomUUID(),data,filter:'EDITED',time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}),createdAt:Date.now(),album:'Edited',favorite:false};
@@ -1238,16 +1239,16 @@ function App() {
             <label className="collage-pick"><input type="checkbox" checked={collageSelection.includes(item.id)} onChange={()=>toggleCollagePhoto(item.id)}/> ADD TO COLLAGE</label>
             <img src={item.data} alt="Saved camera photo"/>
             <div className="studio-photo-meta"><b>{item.title||item.filter||'PHOTO'}</b><span>{item.source||item.album||'CAMERA'}</span></div>
-            <div className="studio-photo-actions"><button onClick={()=>toggleFavorite(item.id)}>{item.favorite?'★ FAVOURITED':'☆ FAVOURITE'}</button><button onClick={()=>setEditorPhoto(item)}>EDIT</button><button onClick={()=>renamePhoto(item.id)}>RENAME</button><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>SAVE ↓</button></div>
+            <div className="studio-photo-actions"><button onClick={()=>toggleFavorite(item.id)}>{item.favorite?'★ FAVOURITED':'☆ FAVOURITE'}</button><button onClick={()=>{setEditBrightness(100);setEditContrast(100);setEditSaturation(100);setEditWarmth(0);setEditRotation(0);setEditCrop('original');setEditMirror(false);setEditMirror(false);setEditorPhoto(item);}}>EDIT</button><button onClick={()=>renamePhoto(item.id)}>RENAME</button><button onClick={()=>saveImage(item.data,'y2k-'+item.id+'.jpg')}>SAVE ↓</button></div>
             <label className="album-assign">ALBUM <select value={item.album||'Camera'} onChange={e=>assignAlbum(item.id,e.target.value)}>{customAlbums.map(album=><option key={album}>{album}</option>)}</select></label>
             <button className="studio-delete" onClick={()=>deleteGalleryItem(item.id)}>DELETE PHOTO ×</button>
           </article>)}</div>}
           {editorPhoto && <div className="editor-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setEditorPhoto(null);}}><section className="editor-dialog" role="dialog" aria-modal="true" aria-label="Photo editor">
             <div className="editor-head"><div><span className="room-kicker">PHOTO LAB</span><h2>Edit photo</h2></div><button onClick={()=>setEditorPhoto(null)}>CLOSE ×</button></div>
-            <img className="editor-preview" src={editorPhoto.data} alt="Photo being edited" style={{filter:'brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+') sepia('+(editWarmth/100*.35)+')',transform:'rotate('+editRotation+'deg)'}}/>
+            <img className="editor-preview" src={editorPhoto.data} alt="Photo being edited" style={{filter:'brightness('+editBrightness/100+') contrast('+editContrast/100+') saturate('+editSaturation/100+') sepia('+(editWarmth/100*.35)+')',transform:'rotate('+editRotation+'deg) scaleX('+(editMirror?-1:1)+')'}}/>
             <label>BRIGHTNESS · {editBrightness}%<input type="range" min="50" max="150" value={editBrightness} onChange={e=>setEditBrightness(Number(e.target.value))}/></label>
             <label>CONTRAST · {editContrast}%<input type="range" min="50" max="150" value={editContrast} onChange={e=>setEditContrast(Number(e.target.value))}/></label>
-            <label>SATURATION · {editSaturation}%<input type="range" min="0" max="180" value={editSaturation} onChange={e=>setEditSaturation(Number(e.target.value))}/></label><label>WARMTH · {editWarmth}%<input type="range" min="0" max="100" value={editWarmth} onChange={e=>setEditWarmth(Number(e.target.value))}/></label><label>CROP RATIO<select value={editCrop} onChange={e=>setEditCrop(e.target.value)}><option value="original">Original</option><option value="square">Square · 1:1</option><option value="portrait">Portrait · 3:4</option><option value="landscape">Landscape · 4:3</option></select></label>
+            <label>SATURATION · {editSaturation}%<input type="range" min="0" max="180" value={editSaturation} onChange={e=>setEditSaturation(Number(e.target.value))}/></label><label>WARMTH · {editWarmth}%<input type="range" min="0" max="100" value={editWarmth} onChange={e=>setEditWarmth(Number(e.target.value))}/></label><label className="editor-mirror-control"><input type="checkbox" checked={editMirror} onChange={e=>setEditMirror(e.target.checked)}/> MIRROR IMAGE ↔</label><label>CROP RATIO<select value={editCrop} onChange={e=>setEditCrop(e.target.value)}><option value="original">Original</option><option value="square">Square · 1:1</option><option value="portrait">Portrait · 3:4</option><option value="landscape">Landscape · 4:3</option></select></label>
             <div className="editor-actions"><button onClick={()=>setEditRotation(v=>(v+90)%360)}>ROTATE 90° ↻</button><button onClick={()=>{setEditBrightness(100);setEditContrast(100);setEditSaturation(100);setEditWarmth(0);setEditRotation(0);setEditCrop('original');}}>RESET</button><button className="primary-button" onClick={saveEditedPhoto}>SAVE EDITED COPY ↗</button></div>
           </section></div>}
         </section>}
@@ -1257,13 +1258,15 @@ function App() {
               <button className="synced-save-button" onClick={saveTogetherPhotos}>↓ SAVE BOTH PHOTOS</button>
               <button className="synced-save-button" onClick={combineTogetherPhotos}>▦ COMBINE INTO ONE</button><label className="layout-choice">LAYOUT <select value={togetherLayout} onChange={e=>setTogetherLayout(e.target.value)}><option value="mirror">Heart pair · mirror one</option><option value="side">Side by side</option><option value="stack">Stacked together</option></select></label>
             </div>}
-            {syncedLocalPhotos.length === 1 ? <div className="synced-pair-grid">
-              <figure><img src={syncedLocalPhotos[0]?.data} alt="Your synchronized photo"/><figcaption>YOU · {syncedLocalPhotos[0]?.filter}</figcaption><button className="synced-save-button" onClick={()=>saveImage(syncedLocalPhotos[0].data,'y2k-together-you.jpg')}>↓ SAVE YOUR PHOTO</button></figure>
-              <figure>{syncedRemotePhotos[0]?.data ? <img src={syncedRemotePhotos[0].data} alt="Your sister's synchronized photo"/> : <div className="synced-pending">Waiting for the other photo…</div>}<figcaption>YOUR PERSON · {syncedRemotePhotos[0]?.filter || 'RECEIVING'}</figcaption>{syncedRemotePhotos[0]?.data && <button className="synced-save-button" onClick={()=>saveImage(syncedRemotePhotos[0].data,'y2k-together-their-photo.jpg')}>↓ SAVE THEIR PHOTO</button>}</figure>
-            </div> : <div className="synced-strip">
-              <div className="synced-strip-label">YOU · TOP ROW</div><div className="synced-strip-row">{[0,1,2,3].map(i=><div key={'local'+i}>{syncedLocalPhotos[i]?.data ? <><img src={syncedLocalPhotos[i].data} alt={'Your strip photo '+(i+1)}/><button className="synced-strip-save" onClick={()=>saveImage(syncedLocalPhotos[i].data,'y2k-together-you-'+(i+1)+'.jpg')} aria-label={'Save your photo '+(i+1)}>↓ SAVE</button></> : <span className="synced-pending">…</span>}</div>)}</div>
-              <div className="synced-strip-label">YOUR PERSON · BOTTOM ROW</div><div className="synced-strip-row">{[0,1,2,3].map(i=><div key={'remote'+i}>{syncedRemotePhotos[i]?.data ? <><img src={syncedRemotePhotos[i].data} alt={"Their strip photo "+(i+1)}/><button className="synced-strip-save" onClick={()=>saveImage(syncedRemotePhotos[i].data,'y2k-together-their-'+(i+1)+'.jpg')} aria-label={'Save their photo '+(i+1)}>↓ SAVE</button></> : <span className="synced-pending">…</span>}</div>)}</div>
-            </div>}
+            <div className={'synced-pair-grid synced-layout-'+togetherLayout}>
+              {syncedLocalPhotos.map((localPhoto,index)=>{
+                const remotePhoto=syncedRemotePhotos[index];
+                return <div className="synced-pair-preview" key={localPhoto?.id||index} style={{display:'flex',flexDirection:togetherLayout==='stack'?'column':'row',gap:16}}>
+                  <figure><img src={localPhoto?.data} alt={'Your synchronized photo '+(index+1)}/><figcaption>YOU · {localPhoto?.filter||'PHOTO'}{syncedLocalPhotos.length>1?' · '+(index+1):''}</figcaption><button className="synced-save-button" onClick={()=>saveImage(localPhoto.data,'y2k-together-you-'+(index+1)+'.jpg')}>↓ SAVE YOUR PHOTO</button></figure>
+                  <figure>{remotePhoto?.data ? <img src={remotePhoto.data} alt={'Your person synchronized photo '+(index+1)} style={{transform:togetherLayout==='mirror'?'scaleX(-1)':'none'}}/> : <div className="synced-pending">Waiting for the other photo…</div>}<figcaption>YOUR PERSON · {remotePhoto?.filter||'RECEIVING'}{syncedRemotePhotos.length>1?' · '+(index+1):''}</figcaption>{remotePhoto?.data && <button className="synced-save-button" onClick={()=>saveImage(remotePhoto.data,'y2k-together-their-'+(index+1)+'.jpg')}>↓ SAVE THEIR PHOTO</button>}</figure>
+                </div>;
+              })}
+            </div>
           </section>}
         {activeTab === 'together' && <section className="together-panel">
           <div className="section-head"><span><i className="tiny-square pink"></i> TOGETHER MODE</span><span className="mono-label">PRIVATE ROOM</span></div>
